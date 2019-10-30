@@ -20,9 +20,6 @@
     <ClCompile Include="Defs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Class.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Code.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

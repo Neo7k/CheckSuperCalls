@@ -22,31 +22,31 @@ using FsPaths = std::vector<fs::path>;
 
 namespace EKeywords
 {
-    enum TYPE : uint
-    {
-        Cur,            // {
-        Ly,             // }
-        Namespace,      // namespace
-        Class,          // class
-        Struct,         // struct
-        Paren,          // (
-        Thesis,         // )
-        SColon,         // ;
-        Colon,          // :
-        Bra,            // <
-        Ket,            // >
-        CallSuper,      // call_super
-        AttriBra,       // [[
-        AttriKet,       // ]]
-        Super,          // __super
-        Friend,         // friend
-        ComStart,       // /*
-        ComEnd,         // */
-        SCom,           // //
-        EOL,            // \n
+	enum TYPE : uint
+	{
+		Cur,            // {
+		Ly,             // }
+		Namespace,      // namespace
+		Class,          // class
+		Struct,         // struct
+		Paren,          // (
+		Thesis,         // )
+		SColon,         // ;
+		Colon,          // :
+		Bra,            // <
+		Ket,            // >
+		CallSuper,      // call_super
+		AttriBra,       // [[
+		AttriKet,       // ]]
+		Super,          // __super
+		Friend,         // friend
+		ComStart,       // /*
+		ComEnd,         // */
+		SCom,           // //
+		EOL,            // \n
 
-        None = (uint)-1
-    };
+		None = (uint)-1
+	};
 }
 
 extern const char* g_Keywords[];

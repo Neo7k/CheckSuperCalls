@@ -122,7 +122,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Class.cpp" />
     <ClCompile Include="Code.cpp" />
     <ClCompile Include="Config.cpp" />
     <ClCompile Include="Defs.cpp" />

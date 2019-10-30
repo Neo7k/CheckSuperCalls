@@ -8,44 +8,44 @@ class Exception : public std::exception
 {
 public:
 
-    Exception(const char* format, ...)
-    {
-        const size_t buf_size = 2048;
-        char buf[buf_size];
-        va_list args;
-        va_start(args, format);
-        sprintf_s(buf, buf_size, format, args);
-        va_end(args);
-        message = buf;
-    }
+	Exception(const char* format, ...)
+	{
+		const size_t buf_size = 2048;
+		char buf[buf_size];
+		va_list args;
+		va_start(args, format);
+		sprintf_s(buf, buf_size, format, args);
+		va_end(args);
+		message = buf;
+	}
 
-    const char* what() const override
-    {
-        return message.c_str();
-    }
+	const char* what() const override
+	{
+		return message.c_str();
+	}
 
 protected:
 
-    std::string message;
+	std::string message;
 };
 
 class ParseException : public Exception
 {
 public:
 
-    template<typename... Values> ParseException(size_t pos, const char* format, Values... data)
-        : Exception(format, data...)
-        , parse_pos(pos)
-    {
-    }
+	template<typename... Values> ParseException(size_t pos, const char* format, Values... data)
+		: Exception(format, data...)
+		, parse_pos(pos)
+	{
+	}
 
-    size_t GetPos() const
-    {
-        return parse_pos;
-    }
+	size_t GetPos() const
+	{
+		return parse_pos;
+	}
 
 protected:
 
-    size_t parse_pos;
+	size_t parse_pos;
 };
 
