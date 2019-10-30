@@ -139,11 +139,11 @@ void ParseNameWithNamespaceBackwards(const char* from, std::string& name, string
 {
 	auto p = from;
 	auto pstr = &name;
-	while (p != to)
+	while (true)
 	{
 		char c = *p;
 		auto& s = *pstr;
-		if (c == ' ' || c == '\t' || c == '\n')
+		if (c == ' ' || c == '\t' || c == '\n' || p == to)
 		{
 			std::reverse(s.begin(), s.end());
 			std::reverse(namespase.begin(), namespase.end());
@@ -159,8 +159,48 @@ void ParseNameWithNamespaceBackwards(const char* from, std::string& name, string
 		}
 
 		s.push_back(c);
-		p--;
+		--p;
 	}
+}
+
+std::string ParseClassNameBackwards(const char* from, const char* to)
+{
+	std::string name;
+	name.reserve(from - to);
+	auto p = from;
+	bool capturing = false;
+	int template_lvl = 0;
+	while (p != to)
+	{
+		char c = *p;
+		if (c == ' ' || c == '\t' || c == '\n')
+		{
+			if (capturing)
+			{
+				std::reverse(name.begin(), name.end());
+				return name;
+			}
+		}
+		else if (c == '>')
+		{
+			++template_lvl;
+			name.push_back(c);
+		}
+		else if (c == '<')
+		{
+			--template_lvl;
+			name.push_back(c);
+		}
+		else
+		{
+			if (template_lvl == 0)
+				capturing = true;
+			name.push_back(c);
+		}
+		--p;
+	}
+	std::reverse(name.begin(), name.end());
+	return name;
 }
 
 std::string DecorateWithNamespace(const std::string& name, const std::string& classname, const string_vector& namespase)
@@ -174,4 +214,17 @@ std::string DecorateWithNamespace(const std::string& name, const std::string& cl
 	result += classname + "::";
 
 	return result + name;
+}
+
+void NormalizeLineEndings(std::string& name)
+{
+	auto p = &name[0];
+	auto e = p + name.length() - 1;
+	for (; p != e; ++p)
+		if (p[0] == '\r')
+			if (p[1] == '\n')
+				p[0] = ' ';
+			else
+				p[0] = '\n';
+
 }

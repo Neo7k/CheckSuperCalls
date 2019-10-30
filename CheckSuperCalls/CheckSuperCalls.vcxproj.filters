@@ -38,6 +38,9 @@
     <ClCompile Include="Workers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Annex.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Strings.h">
@@ -68,6 +71,9 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="Workers.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Annex.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

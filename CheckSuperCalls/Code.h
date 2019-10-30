@@ -3,6 +3,7 @@
 #include "Defs.h"
 
 class Result;
+struct Annex;
 
 class Code
 {
@@ -12,7 +13,8 @@ public:
 
 	void ParseLookup(const std::string& content, const fs::path& path);
 	void ParseHeaderForBaseClasses(const std::string& content);
-	void ParseHeader(const std::string& content, bool skip_if_no_target_funcs = true);
+	void ApplyAnnex(const Annex& annex);
+	void ParseHeader(const fs::path& path, const std::string& content, bool skip_if_no_target_funcs = true);
 	void ParseCpp(int thread_id, const fs::path& path, const std::string& content, Result& results);
 
 	size_t GetClassLookupSize() const;

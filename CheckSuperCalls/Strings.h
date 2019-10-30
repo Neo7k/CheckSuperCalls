@@ -127,6 +127,8 @@ struct SuperClassName
 void ParseInheritance(const char* from, const char* to, std::vector<SuperClassName>& super_classes);
 std::string GetName(const char* from, bool reverse = false);
 void ParseNameWithNamespaceBackwards(const char* from, std::string& name, string_vector& namespase, const char* to = nullptr);
+std::string ParseClassNameBackwards(const char* from, const char* to);
 std::string DecorateWithNamespace(const std::string& name, const std::string& classname, const string_vector& namespase);
+void NormalizeLineEndings(std::string& name);
 uint GetLineIndex(const std::string& str, size_t pos);
 bool strcmp_range(const char* from, const char* to, const char* what);

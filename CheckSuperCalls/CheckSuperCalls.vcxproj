@@ -122,6 +122,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Annex.cpp" />
     <ClCompile Include="Code.cpp" />
     <ClCompile Include="Config.cpp" />
     <ClCompile Include="Defs.cpp" />
@@ -133,6 +134,7 @@
     <ClCompile Include="Workers.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Annex.h" />
     <ClInclude Include="Class.h" />
     <ClInclude Include="Code.h" />
     <ClInclude Include="Config.h" />

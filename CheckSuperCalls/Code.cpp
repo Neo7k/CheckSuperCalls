@@ -3,6 +3,7 @@
 #include "Files.h"
 #include "Exception.h"
 #include "Result.h"
+#include "Annex.h"
 
 Code::~Code()
 {
@@ -28,9 +29,12 @@ void Code::ParseLookup(const std::string& content, const fs::path& path)
 		{
 			if (content[find_res_class.pos_end] != ':')
 			{
-				auto classname = TrimSpaces(&content[pos], &content[find_res_class.pos]);
-				std::unique_lock lock(classdef_lookup_mutex);
-				classdef_lookup[classname].insert(path);
+				auto classname = ParseClassNameBackwards(&content[find_res_class.pos-1], &content[pos]);
+				if (!classname.empty())
+				{
+					std::unique_lock lock(classdef_lookup_mutex);
+					classdef_lookup[classname].insert(path);
+				}
 			}
 			else
 				pos = find_res_class.pos_end + 1;
@@ -81,7 +85,7 @@ void Code::ParseHeaderForBaseClasses(const std::string& content)
 			{
 				if (content[fres.pos_end] != ':')
 				{
-					stack.Push(TrimSpaces(&content[pos], &content[fres.pos]));
+					stack.Push(ParseClassNameBackwards(&content[fres.pos-1], &content[pos]));
 					pos = fres.pos_end;
 					std::array<uint, 1> cur = { EKeywords::Cur };
 					fres = find_first(content, pos, cur);
@@ -93,7 +97,7 @@ void Code::ParseHeaderForBaseClasses(const std::string& content)
 			}
 			else if (fres.key == EKeywords::Cur)
 			{
-				stack.Push(TrimSpaces(&content[pos], &content[fres.pos]));
+				stack.Push(ParseClassNameBackwards(&content[fres.pos - 1], &content[pos]));
 				pos = fres.pos_end;
 			}
 			// else -> Forward declaration or inside of a template
@@ -155,7 +159,21 @@ void Code::ParseHeaderForBaseClasses(const std::string& content)
 	}
 }
 
-void Code::ParseHeader(const std::string& content, bool skip_if_no_target_funcs/* = true*/)
+void Code::ApplyAnnex(const Annex& annex)
+{
+	for (auto& aclazz : annex.classes)
+	{
+		auto clazz = GetClass(aclazz.name, aclazz.namespase, string_vector(), false);
+		if (!clazz)
+			clazz = CreateClass(aclazz.name, aclazz.namespase);
+
+		clazz->functions = aclazz.functions;
+		for (auto& func : aclazz.functions)
+			functions_call_super.push_back(func);
+	}
+}
+
+void Code::ParseHeader(const fs::path& path, const std::string& content, bool skip_if_no_target_funcs/* = true*/)
 {
 	if (skip_if_no_target_funcs)
 	{
@@ -197,7 +215,7 @@ void Code::ParseHeader(const std::string& content, bool skip_if_no_target_funcs/
 			{
 				if (content[fres.pos_end] != ':')
 				{
-					auto classname = TrimSpaces(&content[pos], &content[fres.pos]);
+					auto classname = ParseClassNameBackwards(&content[fres.pos - 1], &content[pos]);
 					if (classname.empty())
 						throw ParseException(fres.pos, "Empty class name found");
 
@@ -223,11 +241,14 @@ void Code::ParseHeader(const std::string& content, bool skip_if_no_target_funcs/
 								if (it != classdef_lookup.end())
 								{
 									auto& parse_paths = it->second;
-									for (auto& path : parse_paths)
+									for (auto& parent_path : parse_paths)
 									{
+										if (parent_path == path)
+											continue;
+
 										std::string file_contents;
-										if (ReadContent(path, file_contents))
-											ParseHeader(file_contents, false);
+										if (ReadContent(parent_path, file_contents))
+											ParseHeader(parent_path, file_contents, false);
 
 									}
 								}

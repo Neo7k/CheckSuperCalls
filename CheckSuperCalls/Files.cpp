@@ -1,5 +1,5 @@
 #include "Files.h"
-#include <fstream>
+#include "Strings.h"
 
 void Walk(CodeType code_type, const Config& config, const std::function<void(const std::filesystem::path& path)>& functor)
 {
@@ -71,8 +71,7 @@ void Walk(CodeType code_type, const Config& config, const std::function<void(con
 
 bool ReadContent(const std::filesystem::path& path, std::string& content)
 {
-	content.clear();
-	std::ifstream f(path);
+	std::ifstream f(path, std::ios_base::in | std::ios_base::binary);
 	if (!f)
 		return false;
 
@@ -81,5 +80,6 @@ bool ReadContent(const std::filesystem::path& path, std::string& content)
 	content.resize(fsize);
 	f.seekg(0, std::ios::beg);
 	f.read(&content[0], fsize);
+	NormalizeLineEndings(content);
 	return true;
 }

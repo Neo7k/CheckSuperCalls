@@ -6,7 +6,6 @@
 bool Config::ParseConfig(const std::filesystem::path& path)
 {
 	using namespace tinyxml2;
-	namespace fs = std::filesystem;
 
 	XMLDocument xml_doc;
 	if (xml_doc.LoadFile(path.string().c_str()) != tinyxml2::XML_SUCCESS)
@@ -133,18 +132,23 @@ bool Config::ParseConfig(const std::filesystem::path& path)
 	auto annex_elem = root->FirstChildElement("Annex");
 	if (annex_elem)
 	{
-		auto class_elem = annex_elem->FirstChildElement("Class");
-		while (class_elem)
+		fs::path annex_location;
+		if (auto path_text = annex_elem->Attribute("path"))
 		{
-			auto& clazz = annex.emplace_back();
-			if (auto name_text = class_elem->Attribute("name"))
+			fs::path file_path(path_text);
+			if (file_path.is_relative())
 			{
-				ParseNameWithNamespaceBackwards(name_text + strlen(name_text), clazz.name, clazz.namespase, name_text - 1);
+				auto full_path = fs::absolute(path).parent_path();
+				full_path /= file_path;
+				annex_location = full_path;
 			}
-			class_elem = class_elem->NextSiblingElement("Class");
+			else
+				annex_location = path_text;
+
+			if (fs::exists(annex_location))
+				annex_path = annex_location;
 		}
 	}
-
 
 	return true;
 }
@@ -162,4 +166,9 @@ const std::vector<Parse>& Config::GetParseStructure() const
 int Config::GetNumThreads() const
 {
 	return num_threads;
+}
+
+const fs::path& Config::GetAnnexPath() const
+{
+	return annex_path;
 }

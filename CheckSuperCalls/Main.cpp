@@ -1,4 +1,5 @@
 #include "Config.h"
+#include "Annex.h"
 #include "Files.h"
 #include "Code.h"
 #include "Workers.h"
@@ -17,6 +18,9 @@ int main(int argc, const char* argv[])
 	if (!config.ParseConfig(argv[1]))
 		return 1;
 
+	Annex annex;
+	annex.Parse(config.GetAnnexPath());
+
 	Code code;
 	FsPaths paths;
 	const size_t potential_files_count = 16384;
@@ -25,7 +29,7 @@ int main(int argc, const char* argv[])
 	Workers workers(config.GetNumThreads());
 	workers.SetPaths(&paths);
 
-	std::cout << "========LOOKUP PHASE==============" << std::endl;
+	std::cout << "==============LOOKUP PHASE==============" << std::endl;
 	Walk(CodeType::Header, config, [&](auto path)
 	{
 		paths.push_back(path);
@@ -43,7 +47,7 @@ int main(int argc, const char* argv[])
 	std::cout << "Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(timer.now() - t0).count() << "ms" << std::endl;
 	t0 = timer.now();
 
-	std::cout << "========BASE SEARCH PHASE==============" << std::endl;
+	std::cout << "========BASE SEARCH PHASE===============" << std::endl;
 	workers.DoJob([&](int thread_index, auto& path)
 	{
 		std::string content;
@@ -55,12 +59,17 @@ int main(int argc, const char* argv[])
 	std::cout << "Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(timer.now() - t0).count() << "ms" << std::endl;
 	t0 = timer.now();
 
-	std::cout << "========HEADER PARSE PHASE==============" << std::endl;
+	std::cout << "===========ANNEX APPLY PHASE============" << std::endl;
+	code.ApplyAnnex(annex);
+	std::cout << "Classes: " << code.GetClassesCount() << std::endl;
+	std::cout << "Super Functions: " << code.GetCSFunctionsCount() << std::endl;
+
+	std::cout << "=========HEADER PARSE PHASE=============" << std::endl;
 	workers.DoJob([&](int thread_index, auto& path)
 	{
 		std::string content;
 		if (ReadContent(path, content))
-			code.ParseHeader(content, true);
+			code.ParseHeader(path, content, true);
 	});
 	std::cout << "Classes: " << code.GetClassesCount() << std::endl;
 	std::cout << "Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(timer.now() - t0).count() << "ms" << std::endl;

@@ -13,6 +13,7 @@
 #include <mutex>
 #include <chrono>
 #include <ctype.h>
+#include <fstream>
 
 using string_vector = std::vector<std::string>;
 using uint = unsigned int;

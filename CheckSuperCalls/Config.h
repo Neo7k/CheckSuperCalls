@@ -1,5 +1,4 @@
 #pragma once
-#include <filesystem>
 #include "Defs.h"
 
 enum class CodeType
@@ -21,12 +20,6 @@ struct Parse
 	std::vector<Skip> skip;
 };
 
-struct AnnexClass
-{
-	string_vector namespase;
-	std::string name;
-	string_vector functions;
-};
 
 class Config
 {
@@ -37,6 +30,7 @@ public:
 	const string_vector& GetExt(CodeType type) const;
 	const std::vector<Parse>& GetParseStructure() const;
 	int GetNumThreads() const;
+	const fs::path& GetAnnexPath() const;
 
 protected:
 
@@ -45,5 +39,5 @@ protected:
 
 	std::vector<Parse> parse;
 	int num_threads = 1;
-	std::vector<AnnexClass> annex;
+	fs::path annex_path;
 };
