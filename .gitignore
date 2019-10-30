@@ -1,0 +1,16 @@
+
+*.db
+*.ipch
+*.log
+*.pdb
+*.ipdb
+*.iobj
+*.exe
+*.txt
+*.ilk
+*.obj
+*.tlog
+*.user
+*.idb
+*.opendb
+.vs/CheckSuperCalls/v15/.suo
