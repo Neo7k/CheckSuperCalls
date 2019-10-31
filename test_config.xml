@@ -1,0 +1,19 @@
+<Root>
+    <Code>
+        <Headers ext=".h|.hpp"/>
+        <Source ext=".cpp"/>
+        
+        <Dir path="Tests/">
+            <Skip dir = "Alfa/SkipThis"/>
+            <Skip file="Alfa/SkipThis.cpp"/>
+        </Dir>
+    </Code>
+    <Options>
+        <Threads num="8"/>
+    </Options>
+	<Annex>
+		<Class name="AActor">
+			<Function name="Tick"/>
+		</Class>
+	</Annex>
+</Root>
