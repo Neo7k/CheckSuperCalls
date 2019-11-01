@@ -1,1 +1,1 @@
-void C::Func_1(){    }
+void ClassC::Func_1(){	}

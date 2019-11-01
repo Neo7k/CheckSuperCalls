@@ -12,10 +12,10 @@ using namespace alpha;
 τοῦ Ὀδυσσέα Ἐλύτη
 */////////////////////
 
-int B::Func_Super() const
+int alpha::B::Func_Super() const
 {
-    int result = A::Func_Super();
-    return result;
+	int result = 0;//A::Func_Super();
+	return result;
 }
 
 /*На берегу пустынных волн

@@ -1,1 +1,1 @@
-#pragma onceclass ClassC : public ClassT<int>{protected:    void Func_1();    private:    friend class alpha::beta::A;    T* t;};
+#pragma onceclass C : public T<int>{protected:	void Func_1();};
