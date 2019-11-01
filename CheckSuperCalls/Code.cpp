@@ -54,7 +54,8 @@ void Code::ParseHeaderForBaseClasses(const std::string& content)
 
 	size_t pos = 0;
 	NamespaseStack stack;
-	std::array<uint, 7> search_keys =
+	int attri_stack = 0;
+	std::array<uint, 10> search_keys =
 	{
 		EKeywords::Namespace,
 		EKeywords::Class,
@@ -62,23 +63,26 @@ void Code::ParseHeaderForBaseClasses(const std::string& content)
 		EKeywords::CallSuper,
 		EKeywords::Cur,
 		EKeywords::Ly,
-		EKeywords::ComStart
+		EKeywords::ComStart,
+		EKeywords::SCom,
+		EKeywords::AttriBra,
+		EKeywords::AttriKet
 	};
 
 	find_res = find_first(content, pos, search_keys);
 	while (find_res)
 	{
 		pos = find_res.pos_end;
+		if (SkipComments(find_res.key, content, pos))
+		{
+			find_res = find_first(content, pos, search_keys);
+			continue;
+		}
+
 		if (find_res.key == EKeywords::Namespace)
 			ParseNamespace(content, pos, stack);
 		else if (find_res.key == EKeywords::Struct || find_res.key == EKeywords::Class)
 		{
-			if (IsComment(content, pos))
-			{
-				find_res = find_first(content, pos, search_keys);
-				continue;
-			}
-
 			std::array<uint, 4> scl_cur_ket = { EKeywords::SColon, EKeywords::Colon, EKeywords::Cur, EKeywords::Ket };
 			auto fres = find_first(content, pos, scl_cur_ket);
 			if (fres.key == EKeywords::Colon)
@@ -102,22 +106,17 @@ void Code::ParseHeaderForBaseClasses(const std::string& content)
 			}
 			// else -> Forward declaration or inside of a template
 		}
-		else if (find_res.key == EKeywords::Cur && !IsComment(content, pos))
+		else if (find_res.key == EKeywords::Cur)
 			stack.Push();
-		else if (find_res.key == EKeywords::Ly && !IsComment(content, pos))
+		else if (find_res.key == EKeywords::Ly)
 			stack.Pop();
-		else if (find_res.key == EKeywords::CallSuper)
+		else if (find_res.key == EKeywords::CallSuper && attri_stack == 1)
 		{
-			if (IsComment(content, pos))
-			{
-				find_res = find_first(content, pos, search_keys);
-				continue;
-			}
-
 			std::array<uint, 1> atket = { EKeywords::AttriKet };
 			auto fres = find_first(content, pos, atket);
 			if (fres.key == EKeywords::AttriKet)
 			{
+				--attri_stack;
 				pos = fres.pos_end;
 				std::array<uint, 1> par = { EKeywords::Paren };
 				fres = find_first(content, pos, par);
@@ -125,7 +124,7 @@ void Code::ParseHeaderForBaseClasses(const std::string& content)
 				{
 					auto funcname = GetName(&content[fres.pos - 1], true);
 					if (stack.namespase.empty())
-						throw ParseException(fres.pos, "Expected the function '%s' to be inside of a class", funcname.c_str());
+						throw ParseException(fres.pos, "Expected the function '%s' to be inside of the class", funcname.c_str());
 
 					auto classname = stack.namespase.back();
 					if (classname.empty())
@@ -149,11 +148,15 @@ void Code::ParseHeaderForBaseClasses(const std::string& content)
 				else
 					throw ParseException(pos, "Expected a '(' in function declaration");
 			}
-			else
-				throw ParseException(pos, "Invalid usage of call_super, not supported yet");
 		}
-		else if (find_res.key == EKeywords::ComStart)
-			SkipMultilineComment(content, pos);
+		else if (find_res.key == EKeywords::AttriBra)
+		{
+			++attri_stack;
+			if (attri_stack > 1)
+				throw ParseException(pos, "Encountered nested [[ ]]");
+		}
+		else if (find_res.key == EKeywords::AttriKet)
+			--attri_stack;
 
 		find_res = find_first(content, pos, search_keys);
 	}
@@ -185,30 +188,31 @@ void Code::ParseHeader(const fs::path& path, const std::string& content, bool sk
 
 	size_t pos = 0;
 	NamespaseStack stack;
-	std::array<uint, 6> search_keys =
+	std::array<uint, 7> search_keys =
 	{
 		EKeywords::Namespace,
 		EKeywords::Class,
 		EKeywords::Struct,
 		EKeywords::Cur,
 		EKeywords::Ly,
-		EKeywords::ComStart
+		EKeywords::ComStart,
+		EKeywords::SCom
 	};
 
 	auto find_res = find_first(content, pos, search_keys);
 	while (find_res)
 	{
 		pos = find_res.pos_end;
+		if (SkipComments(find_res.key, content, pos))
+		{
+			find_res = find_first(content, pos, search_keys);
+			continue;
+		}
+
 		if (find_res.key == EKeywords::Namespace)
 			ParseNamespace(content, pos, stack);
 		else if (find_res.key == EKeywords::Struct || find_res.key == EKeywords::Class)
 		{
-			if (IsComment(content, pos))
-			{
-				find_res = find_first(content, pos, search_keys);
-				continue;
-			}
-
 			std::array<uint, 4> scl_cur_ket = { EKeywords::SColon, EKeywords::Colon, EKeywords::Cur, EKeywords::Ket };
 			auto fres = find_first(content, pos, scl_cur_ket);
 			if (fres.key == EKeywords::Colon)
@@ -284,12 +288,10 @@ void Code::ParseHeader(const fs::path& path, const std::string& content, bool sk
 			}
 			// else -> Forward declaration or inside of a template
 		}
-		else if (find_res.key == EKeywords::Cur && !IsComment(content, pos))
+		else if (find_res.key == EKeywords::Cur)
 			stack.Push();
-		else if (find_res.key == EKeywords::Ly && !IsComment(content, pos))
+		else if (find_res.key == EKeywords::Ly)
 			stack.Pop();
-		else if (find_res.key == EKeywords::ComStart)
-			SkipMultilineComment(content, pos);
 
 		find_res = find_first(content, pos, search_keys);
 	}
@@ -313,9 +315,6 @@ const Class* Code::FindFuncInSuper(const std::string func_name, const Class* cla
 
 void Code::ParseNamespace(const std::string& content, size_t& pos, NamespaseStack& ns)
 {
-	if (IsComment(content, pos))
-		return;
-
 	std::array<uint, 2> cl_cur = { EKeywords::SColon, EKeywords::Cur };
 	auto fres = find_first(content, pos, cl_cur); // Looking for 'namespace X {'
 	if (fres.key == EKeywords::Cur)
@@ -333,7 +332,7 @@ bool Code::IsComment(const std::string& content, size_t pos)
 	return fres.key == EKeywords::SCom;
 }
 
-void Code::SkipMultilineComment(const std::string & content, size_t & pos)
+void Code::SkipMultilineComment(const std::string& content, size_t& pos)
 {
 	std::array<uint, 2> scom{ EKeywords::SCom, EKeywords::EOL };
 	auto fres = find_first_reverse(content, pos, scom);
@@ -348,13 +347,45 @@ void Code::SkipMultilineComment(const std::string & content, size_t & pos)
 	}
 }
 
+bool Code::SkipComments(EKeywords::TYPE key, const std::string& content, size_t& pos)
+{
+	if (key == EKeywords::SCom)
+	{
+		std::array<uint, 1> eol{ EKeywords::EOL };
+		auto fres = find_first(content, pos, eol);
+		if (fres)
+		{
+			pos = fres.pos_end;
+			return true;
+		}
+		else
+			throw ParseException(pos, "Can't find EOL after a //");
+	}
+	else if (key == EKeywords::ComStart)
+	{
+		SkipMultilineComment(content, pos);
+		return true;
+	}
+	return false;
+}
+
 void Code::ParseCpp(int thread_id, const fs::path& path, const std::string& content, Result& result)
 {
-	std::array<uint, 0> none;
+	std::array<uint, 2> com{EKeywords::ComStart, EKeywords::SCom};
 	size_t pos = 0;
-	auto find_res = find_first(content, pos, none, functions_call_super);
+	auto find_res = find_first(content, pos, com, functions_call_super);
 	while (find_res)
 	{
+		if (find_res.key == EKeywords::ComStart || find_res.key == EKeywords::SCom)
+		{
+			pos = find_res.pos_end;
+			if (SkipComments(find_res.key, content, pos))
+			{
+				find_res = find_first(content, pos, com, functions_call_super);
+				continue;
+			}
+		}
+
 		pos = find_res.pos;
 		std::array<uint, 2> cur_scol = { EKeywords::Cur, EKeywords::SColon };
 		auto func_decl_find_res = find_first(content, pos, cur_scol);
@@ -370,7 +401,7 @@ void Code::ParseCpp(int thread_id, const fs::path& path, const std::string& cont
 				auto super_clazz = FindFuncInSuper(func_name, clazz);
 				if (super_clazz && super_clazz != clazz)
 				{
-					std::array<uint, 2> curly = { EKeywords::Cur, EKeywords::Ly };
+					std::array<uint, 4> curly = { EKeywords::Cur, EKeywords::Ly, EKeywords::ComStart, EKeywords::SCom };
 					string_vector funcname_search{ func_name };
 					pos = func_decl_find_res.pos_end;
 					auto func_find_res = find_first(content, pos, curly, funcname_search);
@@ -380,6 +411,12 @@ void Code::ParseCpp(int thread_id, const fs::path& path, const std::string& cont
 					{
 						if (!func_find_res)
 							throw ParseException(pos, "Can't find the end of the function '%s'", func_name.c_str());
+
+						if (SkipComments(func_find_res.key, content, pos))
+						{
+							func_find_res = find_first(content, pos, curly, funcname_search);
+							continue;
+						}
 
 						if (func_find_res.key == EKeywords::Cur)
 							stack++;
@@ -399,7 +436,7 @@ void Code::ParseCpp(int thread_id, const fs::path& path, const std::string& cont
 		}
 
 		pos = func_decl_find_res.pos;
-		find_res = find_first(content, pos, none, functions_call_super);
+		find_res = find_first(content, pos, com, functions_call_super);
 	}
 }
 

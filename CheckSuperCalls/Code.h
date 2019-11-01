@@ -42,6 +42,7 @@ protected:
 	void ParseNamespace(const std::string& content, size_t& pos, NamespaseStack& ns);
 	bool IsComment(const std::string& content, size_t pos);
 	void SkipMultilineComment(const std::string& content, size_t& pos);
+	bool SkipComments(EKeywords::TYPE key, const std::string& content, size_t& pos);
 
 	std::vector<Class*> classes;
 	mutable std::mutex classes_mutex;
