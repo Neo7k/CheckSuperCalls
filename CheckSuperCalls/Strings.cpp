@@ -49,7 +49,7 @@ void ParseInheritance(const char* from, const char* to, std::vector<SuperClassNa
 	auto pc = from;
 	super_classes.emplace_back();
 
-	while (pc != to)
+	while (pc < to)
 	{
 		char c = *pc;
 		if (c != ' ' && c != '\t' && c != '\n')
@@ -89,6 +89,30 @@ void ParseInheritance(const char* from, const char* to, std::vector<SuperClassNa
 				}
 				super_classes.emplace_back();
 				continue;
+			}
+			else if (c == '<')
+			{
+				while (pc != to && *pc != '>')
+					++pc;
+				++pc;
+				continue;
+			}
+			else if (c == '/')
+			{
+				if (pc[1] == '/')
+				{
+					while (pc != to && *pc != '\n')
+						++pc;
+					++pc;
+					continue;
+				}
+				else if (pc[1] == '*')
+				{
+					while (pc != to && !(pc[0] == '*' && pc[1] == '/'))
+						++pc;
+					pc += 2;
+					continue;
+				}
 			}
 
 			str.push_back(c);
