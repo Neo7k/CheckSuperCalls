@@ -76,5 +76,8 @@
     <ClInclude Include="Annex.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="Algorithms.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

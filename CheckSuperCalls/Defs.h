@@ -3,6 +3,7 @@
 #include <vector>
 #include <algorithm>
 #include <unordered_map>
+#include <map>
 #include <filesystem>
 #include <set>
 #include <array>
@@ -14,12 +15,32 @@
 #include <chrono>
 #include <ctype.h>
 #include <fstream>
+#include <functional>
+#include <filesystem>
 
 using string_vector = std::vector<std::string>;
 using uint = unsigned int;
 using uchar = unsigned char;
 namespace fs = std::filesystem;
 using FsPaths = std::vector<fs::path>;
+
+namespace std
+{
+	template<>
+	struct hash<fs::path> : private hash<string>
+	{
+		size_t operator()(const fs::path& path) const
+		{
+			return hash<string>::operator()(path.u8string());
+		}
+	};
+}
+
+enum class CodeType
+{
+	Header,
+	Source
+};
 
 namespace EKeywords
 {
@@ -45,6 +66,7 @@ namespace EKeywords
 		ComEnd,         // */
 		SCom,           // //
 		EOL,            // \n
+		Quotation,      // "
 
 		None = (uint)-1
 	};

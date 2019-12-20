@@ -19,7 +19,8 @@ const char* g_Keywords[] =
 	"/*",
 	"*/",
 	"//",
-	"\n"
+	"\n",
+	"\""
 };
 
 unsigned char g_KeywordsLengths[] =
@@ -43,5 +44,6 @@ unsigned char g_KeywordsLengths[] =
 	2,
 	2,
 	2,
+	1,
 	1
 };

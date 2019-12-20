@@ -4,6 +4,8 @@
 #include "Exception.h"
 #include "Result.h"
 #include "Annex.h"
+#include "Class.h"
+#include "Algorithms.h"
 
 Code::~Code()
 {
@@ -13,7 +15,47 @@ Code::~Code()
 	classes.clear();
 }
 
-void Code::ParseLookup(const std::string& content, const fs::path& path)
+void Code::UpdateCachedData(const CodeFiles& code_files)
+{
+	std::map<fs::path, std::vector<uint>> classes_by_file;
+
+	for (uint i = 0; i < (uint)classes.size(); ++i)
+		classes_by_file[classes[i]->file].push_back(i);
+
+	auto DeleteChangedClasses = [this, &classes_by_file](const fs::path& path)
+	{
+		auto it = classes_by_file.find(path);
+		if (it == classes_by_file.end())
+			return;
+
+		auto& class_indexes = it->second;
+		for (auto class_index : class_indexes)
+		{
+			auto& clazz = classes[class_index];
+
+			for (auto& der_class : clazz->derived_classes)
+				Erase(der_class->super_classes, clazz);
+			for (auto& sup_class : clazz->super_classes)
+				Erase(sup_class->derived_classes, clazz);
+
+			delete clazz;
+			clazz = nullptr;
+		}
+	};
+
+	for (auto& path : code_files.deleted_files)
+		DeleteChangedClasses(path);
+
+	for (auto& path : code_files.changed_headers)
+		DeleteChangedClasses(path);
+
+	for (auto& path : code_files.changed_source)
+		DeleteChangedClasses(path);
+
+	Erase(classes, nullptr);
+}
+
+void Code::ParseLookup(const fs::path& path, const std::string& content)
 {
 	std::array<uint, 2> cl_st = { EKeywords::Class, EKeywords::Struct };
 	std::array<uint, 4> cur_scol = { EKeywords::Cur, EKeywords::Colon, EKeywords::SColon, EKeywords::Paren };
@@ -33,7 +75,9 @@ void Code::ParseLookup(const std::string& content, const fs::path& path)
 				if (!classname.empty())
 				{
 					std::unique_lock lock(classdef_lookup_mutex);
-					classdef_lookup[classname].insert(path);
+					auto& files = classdef_lookup[classname];
+					if (Find(files, path) == files.end())
+						classdef_lookup[classname].push_back(path);
 				}
 			}
 			else
@@ -45,7 +89,7 @@ void Code::ParseLookup(const std::string& content, const fs::path& path)
 }
 
 
-void Code::ParseHeaderForBaseClasses(const std::string& content)
+void Code::ParseHeaderForBaseClasses(const fs::path& path, const std::string& content)
 {
 	std::array<uint, 1> sup = { EKeywords::CallSuper };
 	auto find_res = find_first(content, 0, sup);
@@ -130,19 +174,22 @@ void Code::ParseHeaderForBaseClasses(const std::string& content)
 					if (classname.empty())
 						throw ParseException(fres.pos, "Empty class name found");
 
-					auto clazz = GetClass(classname, stack.namespase_trunk, string_vector(), true);
-					if (!clazz)
-						clazz = CreateClass(classname, stack.namespase_trunk);
+					Class* clazz;
+					{
+						std::lock_guard lock(classes_mutex);
+						clazz = GetClass(classname, stack.namespase_trunk, string_vector());
+						if (!clazz)
+							clazz = CreateClass(classname, stack.namespase_trunk, path);
+					}
 
 					// Leaving the class without mutex lock
 					// That should not call the race condition,
 					// since a single class definition can't be split into different header files
 					// which the threads are working on
-					clazz->functions.push_back(funcname);
-					{
-						std::unique_lock lock(functions_call_super_mutex);
-						functions_call_super.push_back(funcname);
-					}
+					auto& funcs = clazz->functions;
+					if (Find(funcs, funcname) == funcs.end())
+						clazz->functions.push_back(funcname);
+
 					pos = fres.pos_end;
 				}
 				else
@@ -166,17 +213,56 @@ void Code::ApplyAnnex(const Annex& annex)
 {
 	for (auto& aclazz : annex.classes)
 	{
-		auto clazz = GetClass(aclazz.name, aclazz.namespase, string_vector(), false);
+		auto clazz = GetClass(aclazz.name, aclazz.namespase, string_vector());
 		if (!clazz)
-			clazz = CreateClass(aclazz.name, aclazz.namespase);
+			clazz = CreateClass(aclazz.name, aclazz.namespase, fs::path());
 
 		clazz->functions = aclazz.functions;
-		for (auto& func : aclazz.functions)
-			functions_call_super.push_back(func);
 	}
 }
 
-void Code::ParseHeader(const fs::path& path, const std::string& content, bool skip_if_no_target_funcs/* = true*/)
+void Code::UpdateAllCallSupers()
+{
+	std::set<std::string> old_cs;
+	for (auto& func : functions_call_super)
+		old_cs.insert(func);
+
+
+	std::set<std::string> cs;
+	for (auto clazz : classes)
+	{
+		for (auto& func : clazz->functions)
+			cs.insert(func);
+	}
+
+	for (auto& func : old_cs)
+		if (cs.find(func) == cs.end())
+			functions_call_super_removed.push_back(func);
+	
+	for (auto& func : cs)
+		if (old_cs.find(func) == old_cs.end())
+			functions_call_super_added.push_back(func);
+
+	functions_call_super.clear();
+	for (auto& func : cs)
+		functions_call_super.push_back(func);
+}
+
+void Code::CollectAllCallSupers()
+{
+	std::set<std::string> cs;
+	for (auto clazz : classes)
+	{
+		for (auto& func : clazz->functions)
+			cs.insert(func);
+	}
+
+	functions_call_super.clear();
+	for (auto& func : cs)
+		functions_call_super.push_back(func);
+}
+
+void Code::ParseHeader(const fs::path& path, const std::string& content, bool skip_if_no_target_funcs, FsPaths& parsed_paths)
 {
 	if (skip_if_no_target_funcs)
 	{
@@ -185,6 +271,8 @@ void Code::ParseHeader(const fs::path& path, const std::string& content, bool sk
 		if (!find_res)
 			return;
 	}
+
+	parsed_paths.push_back(path);
 
 	size_t pos = 0;
 	NamespaseStack stack;
@@ -224,9 +312,13 @@ void Code::ParseHeader(const fs::path& path, const std::string& content, bool sk
 						throw ParseException(fres.pos, "Empty class name found");
 
 					string_vector pos_ns;
-					auto clazz = GetClass(classname, stack.namespase, string_vector(), true);
-					if (!clazz)
-						clazz = CreateClass(classname, stack.namespase);
+					Class* clazz = nullptr;
+					{
+						std::lock_guard lock(classes_mutex);
+						clazz = GetClass(classname, stack.namespase, string_vector());
+						if (!clazz)
+							clazz = CreateClass(classname, stack.namespase, path);
+					}
 
 					pos = fres.pos_end;
 					std::array<uint, 1> cur = { EKeywords::Cur };
@@ -238,28 +330,29 @@ void Code::ParseHeader(const fs::path& path, const std::string& content, bool sk
 						for (auto& parent : inheritance)
 						{
 							auto& parent_classname = parent.name;
-							auto parent_clazz = GetClass(parent_classname, parent.namespase, stack.namespase, true);
+							std::lock_guard lock(classes_mutex);
+							auto parent_clazz = GetClass(parent_classname, parent.namespase, stack.namespase);
 							if (!parent_clazz)
 							{
 								auto it = classdef_lookup.find(parent_classname);
 								if (it != classdef_lookup.end())
 								{
-									auto& parse_paths = it->second;
-									for (auto& parent_path : parse_paths)
+									auto& class_def_paths = it->second;
+									for (auto& parent_path : class_def_paths)
 									{
-										if (parent_path == path)
+										if (Find(parsed_paths, parent_path) != parsed_paths.end())
 											continue;
 
 										std::string file_contents;
 										if (ReadContent(parent_path, file_contents))
-											ParseHeader(parent_path, file_contents, false);
+											ParseHeader(parent_path, file_contents, false, parsed_paths);
 
 									}
 								}
 
-								parent_clazz = GetClass(parent_classname, parent.namespase, stack.namespase, true);
+								parent_clazz = GetClass(parent_classname, parent.namespase, stack.namespase);
 								if (!parent_clazz)
-									parent_clazz = CreateClass(parent_classname, string_vector());
+									parent_clazz = CreateClass(parent_classname, string_vector(), path);
 							}
 
 							clazz->super_classes.push_back(parent_clazz);
@@ -278,9 +371,10 @@ void Code::ParseHeader(const fs::path& path, const std::string& content, bool sk
 
 				if (!classname.empty())
 				{
-					auto clazz = GetClass(classname, stack.namespase, string_vector(), true);
+					std::lock_guard lock(classes_mutex);
+					auto clazz = GetClass(classname, stack.namespase, string_vector());
 					if (!clazz)
-						clazz = CreateClass(classname, stack.namespase);
+						clazz = CreateClass(classname, stack.namespase, path);
 
 					pos = fres.pos_end;
 					stack.Push(std::move(classname));
@@ -338,12 +432,9 @@ void Code::SkipMultilineComment(const std::string& content, size_t& pos)
 	auto fres = find_first_reverse(content, pos, scom);
 	if (fres.key != EKeywords::SCom)
 	{
-		std::array<uint, 1> comend{ EKeywords::ComEnd };
+		std::array<uint, 2> comend{ EKeywords::ComEnd, EKeywords::Quotation };
 		auto fres = find_first(content, pos, comend);
-		if (fres)
-			pos = fres.pos;
-		else
-			throw ParseException(pos, "Can't find the end of the multiline comment");
+		pos = fres.pos; // TODO: '/*' Could be inside of a literal, handle this case
 	}
 }
 
@@ -359,13 +450,17 @@ bool Code::SkipComments(EKeywords::TYPE key, const std::string& content, size_t&
 			return true;
 		}
 		else
-			throw ParseException(pos, "Can't find EOL after a //");
+		{
+			pos = content.size(); // ending the search, hit EOF
+			return true;
+		}
 	}
 	else if (key == EKeywords::ComStart)
 	{
 		SkipMultilineComment(content, pos);
 		return true;
 	}
+
 	return false;
 }
 
@@ -395,7 +490,7 @@ void Code::ParseCpp(int thread_id, const fs::path& path, const std::string& cont
 			string_vector namespase;
 			auto& func_name = functions_call_super[find_res.extra_index];
 			ParseNameWithNamespaceBackwards(&content[find_res.pos - 3], name, namespase); // -3 to skip '::'
-			auto clazz = GetClass(name, namespase, string_vector(), false);
+			auto clazz = GetClass(name, namespase, string_vector());
 			if (clazz)
 			{
 				auto super_clazz = FindFuncInSuper(func_name, clazz);
@@ -430,13 +525,101 @@ void Code::ParseCpp(int thread_id, const fs::path& path, const std::string& cont
 					}
 
 					if (!super_called)
-						result.AddIssue(new Issue{ path, GetLineIndex(content, find_res.pos), DecorateWithNamespace(func_name, name, namespase) }, thread_id);
+					{
+						auto func_namespace = namespase;
+						func_namespace.push_back(name);
+                        result.AddIssue(new Issue{ path, GetLineIndex(content, find_res.pos), {func_name, func_namespace}, {func_name, super_clazz->namespase}}, thread_id);
+					}
 				}
 			}
 		}
 
 		pos = func_decl_find_res.pos;
 		find_res = find_first(content, pos, com, functions_call_super);
+	}
+}
+
+void Code::ReadCache(std::ifstream& f)
+{
+	Deserialize(f, classdef_lookup);
+
+	uint32_t sz;
+	Deserialize(f, sz);
+	classes.resize(sz);
+	for (uint32_t i = 0; i < sz; ++i)
+		classes[i] = new Class;
+
+	for (uint32_t i = 0; i < sz; ++i)
+	{
+		auto clazz = classes[i];
+		Deserialize(f, clazz->name);
+		Deserialize(f, clazz->namespase);
+		Deserialize(f, clazz->functions);
+		Deserialize(f, clazz->file);
+		{
+			size_t sz;
+			Deserialize(f, sz);
+			for (size_t j = 0; j < sz; ++j)
+			{
+				uint32_t id;
+				Deserialize(f, id);
+				if (id >= classes.size())
+					throw Exception("Class with id=%u does not exist", id);
+
+				clazz->super_classes.push_back(classes[id]);
+			}
+		}
+		{
+			size_t sz;
+			Deserialize(f, sz);
+			for (size_t j = 0; j < sz; ++j)
+			{
+				uint32_t id;
+				Deserialize(f, id);
+				if (id >= classes.size())
+					throw Exception("Class with id=%u does not exist", id);
+
+				clazz->derived_classes.push_back(classes[id]);
+			}
+		}
+	}
+
+	CollectAllCallSupers();
+}
+
+void Code::WriteCache(std::ofstream& f) const
+{
+	Serialize(f, classdef_lookup);
+
+	uint32_t sz = (uint32_t)classes.size();
+	Serialize(f, sz);
+	for (uint32_t i = 0; i < sz; ++i)
+	{
+		auto clazz = classes[i];
+		Serialize(f, clazz->name);
+		Serialize(f, clazz->namespase);
+		Serialize(f, clazz->functions);
+		Serialize(f, clazz->file);
+		Serialize(f, clazz->super_classes.size());
+		for (auto super_clazz : clazz->super_classes)
+		{
+			auto it = Find(classes, super_clazz);
+			if (it == classes.end())
+				throw Exception("Class is not registered");
+
+			uint32_t id = (uint32_t)(it - classes.begin());
+			Serialize(f, id);
+		}
+		Serialize(f, clazz->derived_classes.size());
+		for (auto derived_clazz : clazz->derived_classes)
+		{
+			auto it = Find(classes, derived_clazz);
+			if (it == classes.end())
+				throw Exception("Class is not registered");
+
+			uint32_t id = (uint32_t)(it - classes.begin());
+			Serialize(f, id);
+		}
 	}
 }
 
@@ -455,14 +638,25 @@ size_t Code::GetCSFunctionsCount() const
 	return functions_call_super.size();
 }
 
-Class* Code::GetClass(const std::string& name, const string_vector& namespase, const string_vector& possible_namespase, bool thread_lock) const
+bool Code::DidCSFunctionsChange() const
+{
+	return !functions_call_super_added.empty() || !functions_call_super_removed.empty();
+}
+
+const string_vector& Code::GetCSFunctionsAdded() const
+{
+	return functions_call_super_added;
+}
+
+const string_vector& Code::GetCSFunctionsRemoved() const
+{
+	return functions_call_super_removed;
+}
+
+Class* Code::GetClass(const std::string& name, const string_vector& namespase, const string_vector& possible_namespase) const
 {
 	if (name.empty())
 		return nullptr;
-
-	std::unique_lock lock(classes_mutex, std::defer_lock);
-	if (thread_lock)
-		lock.lock();
 
 	for (auto& clazz : classes)
 	{
@@ -539,7 +733,7 @@ Class* Code::GetClass(const std::string& name, const string_vector& namespase, c
 	return nullptr;
 }
 
-Class* Code::CreateClass(const std::string& name, const string_vector& namespase)
+Class* Code::CreateClass(const std::string& name, const string_vector& namespase, const fs::path& file)
 {
 	if (name.empty())
 		return nullptr;
@@ -547,8 +741,8 @@ Class* Code::CreateClass(const std::string& name, const string_vector& namespase
 	auto clazz = new Class;
 	clazz->name = name;
 	clazz->namespase = namespase;
+	clazz->file = file;
 
-	std::unique_lock lock(classes_mutex);
 	classes.push_back(clazz);
 
 	return clazz;

@@ -1,12 +1,33 @@
 #pragma once
 #include "Defs.h"
 
+struct FuncName
+{
+	std::string name;
+	string_vector namespase;
+
+	bool operator == (const FuncName& other) const
+	{
+		if (namespase.size() != other.namespase.size())
+			return false;
+
+		for (uint i = 0; i < namespase.size(); ++i)
+			if (namespase[i] != other.namespase[i])
+				return false;
+
+		return name == other.name;
+	}
+};
+
 struct Issue
 {
-	fs::path filepath;
+	fs::path file;
 	uint line;
-	std::string funcname;
+	FuncName funcname;
+	FuncName root_funcname;
 };
+
+struct CodeFiles;
 
 class Result
 {
@@ -21,7 +42,16 @@ public:
 	void AddIssue(Issue* issue, int thread_id);
 	IssuesVec GetAllIssues() const;
 
+	void ReadCache(std::ifstream& f);
+	void WriteCache(std::ofstream& f) const;
+
+	void UpdateCachedData(const CodeFiles& code_files);
+
+	void Clear();
+	void EraseCachedIssues(const FuncName& root_func);
+
 protected:
 
 	std::vector<IssuesVec> issues;
+	IssuesVec cached_issues;
 };

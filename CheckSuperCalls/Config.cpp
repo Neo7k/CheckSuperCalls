@@ -55,29 +55,16 @@ bool Config::ParseConfig(const std::filesystem::path& path)
 	auto dir_elem = code_elem->FirstChildElement("Dir");
 	while (dir_elem)
 	{
-		fs::path scan_path;
-		if (auto path_text = dir_elem->Attribute("path"))
+		fs::path scan_path = GetPath(path, dir_elem->Attribute("path"));
+		if (fs::exists(scan_path))
 		{
-			fs::path dir_path(path_text);
-			if (dir_path.is_relative())
-			{
-				auto full_path = fs::absolute(path).parent_path();
-				full_path /= dir_path;
-				scan_path = full_path;
-			}
-			else
-				scan_path = path_text;
-
-			if (fs::exists(scan_path))
-			{
-				auto& p = parse.emplace_back();
-				p.dir = scan_path;
-			}
-			else
-			{
-				dir_elem = dir_elem->NextSiblingElement("Dir");
-				continue;
-			}
+			auto& p = parse.emplace_back();
+			p.dir = scan_path;
+		}
+		else
+		{
+			dir_elem = dir_elem->NextSiblingElement("Dir");
+			continue;
 		}
 
 		auto skip_elem = dir_elem->FirstChildElement("Skip");
@@ -98,24 +85,12 @@ bool Config::ParseConfig(const std::filesystem::path& path)
 	auto file_elem = code_elem->FirstChildElement("File");
 	while (file_elem)
 	{
-		fs::path scan_path;
-		if (auto path_text = file_elem->Attribute("path"))
-		{
-			fs::path file_path(path_text);
-			if (file_path.is_relative())
-			{
-				auto full_path = fs::absolute(path).parent_path();
-				full_path /= file_path;
-				scan_path = full_path;
-			}
-			else
-				scan_path = path_text;
+		fs::path scan_path = GetPath(path, file_elem->Attribute("path"));
 
-			if (fs::exists(scan_path))
-			{
-				auto& p = parse.emplace_back();
-				p.file = scan_path;
-			}
+		if (fs::exists(scan_path))
+		{
+			auto& p = parse.emplace_back();
+			p.file = scan_path;
 		}
 
 		file_elem = file_elem->NextSiblingElement("File");
@@ -127,28 +102,15 @@ bool Config::ParseConfig(const std::filesystem::path& path)
 		auto threads_elem = options_elem->FirstChildElement("Threads");
 		if (threads_elem)
 			num_threads = threads_elem->IntAttribute("num", 1);
+
+		auto cache_elem = options_elem->FirstChildElement("Cache");
+		if (cache_elem)
+			cache_path = GetPath(path, cache_elem->Attribute("path"));
 	}
 
 	auto annex_elem = root->FirstChildElement("Annex");
 	if (annex_elem)
-	{
-		fs::path annex_location;
-		if (auto path_text = annex_elem->Attribute("path"))
-		{
-			fs::path file_path(path_text);
-			if (file_path.is_relative())
-			{
-				auto full_path = fs::absolute(path).parent_path();
-				full_path /= file_path;
-				annex_location = full_path;
-			}
-			else
-				annex_location = path_text;
-
-			if (fs::exists(annex_location))
-				annex_path = annex_location;
-		}
-	}
+		annex_path = GetPath(path, annex_elem->Attribute("path"));
 
 	return true;
 }
@@ -168,7 +130,26 @@ int Config::GetNumThreads() const
 	return num_threads;
 }
 
+const fs::path& Config::GetCachePath() const
+{
+	return cache_path;
+}
+
 const fs::path& Config::GetAnnexPath() const
 {
 	return annex_path;
+}
+
+fs::path Config::GetPath(const std::filesystem::path& conf_path, const char* path_text) const
+{
+	if (!path_text)
+		return fs::path();
+
+	fs::path path(path_text);
+	if (!path.is_relative())
+		return path;
+
+	auto full_path = fs::absolute(conf_path).parent_path();
+	full_path /= path;
+	return full_path;
 }

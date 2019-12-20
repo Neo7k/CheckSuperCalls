@@ -4,6 +4,7 @@
 #include "Code.h"
 #include "Workers.h"
 #include "Result.h"
+#include "Strings.h"
 
 int main(int argc, const char* argv[])
 {
@@ -22,27 +23,57 @@ int main(int argc, const char* argv[])
 	annex.Parse(config.GetAnnexPath());
 
 	Code code;
-	FsPaths paths;
-	const size_t potential_files_count = 16384;
-	paths.reserve(potential_files_count);
+	Result result(config.GetNumThreads());
+	CodeFiles files;
 
-	Workers workers(config.GetNumThreads());
-	workers.SetPaths(&paths);
-
-	std::cout << "==============LOOKUP PHASE==============" << std::endl;
-	Walk(CodeType::Header, config, [&](auto path)
+	std::cout << "==============CACHE PHASE==============" << std::endl;
+	t0 = timer.now();
 	{
-		paths.push_back(path);
+		std::ifstream f(config.GetCachePath(), std::ios::binary);
+		if (f)
+		{
+			files.ReadCache(f);
+			code.ReadCache(f);
+			result.ReadCache(f);
+		}
+	}
+
+	const uint possible_files_count = 16384; // cuz why not
+	PathTsVec header_files; header_files.reserve(possible_files_count);
+	PathTsVec source_files; source_files.reserve(possible_files_count);
+
+	Walk(CodeType::Header, config, [&](auto& path) 
+	{
+		header_files.emplace_back(PathTs{path, fs::last_write_time(path)});
 	});
 
+	Walk(CodeType::Source, config, [&](auto& path) 
+	{
+		source_files.emplace_back(PathTs{path, fs::last_write_time(path)});
+	});
+
+	files.SyncCacheToFiles(header_files, source_files);
+	code.UpdateCachedData(files);
+	result.UpdateCachedData(files);
+
+	std::cout << "Files: " << std::endl;
+	std::cout << "|--overall: " << header_files.size() + source_files.size() << std::endl;
+	std::cout << "|--changed: " << files.changed_headers.size() + files.changed_source.size() << std::endl;
+	std::cout << "|--deleted: " << files.deleted_files.size() << std::endl;
+	std::cout << "Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(timer.now() - t0).count() << "ms" << std::endl;
+	t0 = timer.now();
+
+	Workers workers(config.GetNumThreads());
+	workers.SetPaths(&files.changed_headers);
+
+	std::cout << "==============LOOKUP PHASE==============" << std::endl;
 	workers.DoJob([&](int thread_index, auto& path)
 	{
 		std::string content;
 		if (ReadContent(path, content))
-			code.ParseLookup(content, path);
+			code.ParseLookup(path, content);
 	});
 
-	std::cout << "Files: " << paths.size() << std::endl;
 	std::cout << "Classes: " << code.GetClassLookupSize() << std::endl;
 	std::cout << "Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(timer.now() - t0).count() << "ms" << std::endl;
 	t0 = timer.now();
@@ -52,10 +83,33 @@ int main(int argc, const char* argv[])
 	{
 		std::string content;
 		if (ReadContent(path, content))
-			code.ParseHeaderForBaseClasses(content);
+			code.ParseHeaderForBaseClasses(path, content);
 	});
+	
+	code.UpdateAllCallSupers();
+	
 	std::cout << "Classes: " << code.GetClassesCount() << std::endl;
 	std::cout << "Super Functions: " << code.GetCSFunctionsCount() << std::endl;
+	if (code.DidCSFunctionsChange())
+	{
+		
+		std::cout << "Super Functions have changed:" << std::endl;
+		std::cout << "|--added: " << code.GetCSFunctionsAdded().size() << std::endl;
+		std::cout << "|--deleted: " << code.GetCSFunctionsRemoved().size() << std::endl;
+
+		if (!code.GetCSFunctionsAdded().empty())
+		{
+			std::cout << "... performing full rebuild" << std::endl;
+			files.MarkAllChanged();
+			result.Clear();
+		}
+		else if (!code.GetCSFunctionsRemoved().empty())
+		{
+			std::cout << "... cleaning removed functions from the result cache" << std::endl;
+			// TODO:
+			//result.EraseCachedIssues(code.GetCSFunctionsRemoved());
+		}
+	}
 	std::cout << "Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(timer.now() - t0).count() << "ms" << std::endl;
 	t0 = timer.now();
 
@@ -68,22 +122,17 @@ int main(int argc, const char* argv[])
 	workers.DoJob([&](int thread_index, auto& path)
 	{
 		std::string content;
+		FsPaths paths;
 		if (ReadContent(path, content))
-			code.ParseHeader(path, content, true);
+			code.ParseHeader(path, content, true, paths);
 	});
 	std::cout << "Classes: " << code.GetClassesCount() << std::endl;
 	std::cout << "Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(timer.now() - t0).count() << "ms" << std::endl;
 	t0 = timer.now();
 
 	std::cout << "========SOURCE PARSE PHASE==============" << std::endl;
-	paths.clear();
-	Walk(CodeType::Source, config, [&](auto path)
-	{
-		paths.push_back(path);
-	});
 
-	Result result(config.GetNumThreads());
-
+	workers.SetPaths(&files.changed_source);
 	workers.DoJob([&](int thread_index, auto& path)
 	{
 		std::string content;
@@ -91,16 +140,25 @@ int main(int argc, const char* argv[])
 			code.ParseCpp(thread_index, path, content, result);
 	});
 
-	std::cout << "Files: " << paths.size() << std::endl;
 	std::cout << "Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(timer.now() - t0).count() << "ms" << std::endl;
 
 	std::cout << "===============RESULT====================" << std::endl;
 	auto issues = result.GetAllIssues();
 	for (auto& issue : issues)
-		std::cout << issue->filepath.string() << "(" << issue->line << "): No super call in " << issue->funcname << std::endl;
+		std::cout << issue->file.string() << "(" << issue->line << "): No super call in " << DecorateWithNamespace(issue->funcname.name, issue->funcname.namespase) << std::endl;
 
 	std::cout << "===============RESUME====================" << std::endl;
 	std::cout << "Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(timer.now() - t00).count() << "ms" << std::endl;
+
+	{
+		std::ofstream f(config.GetCachePath(), std::ios::binary);
+		if (f)
+		{
+			files.WriteCache(f);
+			code.WriteCache(f);
+			result.WriteCache(f);
+		}
+	}
 
 	return 0;
 }

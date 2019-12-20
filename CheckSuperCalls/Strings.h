@@ -14,7 +14,7 @@ struct find_result
 	}
 };
 
-inline bool find_first_impl(const char* str, const char* keyword, unsigned char keyword_length)
+inline bool find_first_impl(const char* str, const char* keyword, unsigned char keyword_length, bool positive_pos)
 {
 	if (str[0] != keyword[0])
 		return false;
@@ -27,7 +27,10 @@ inline bool find_first_impl(const char* str, const char* keyword, unsigned char 
 	if ((unsigned char)str[j] > 127u)
 		return false;
 
-	if (isalnum(str[0]) && isalnum(str[j]))
+	if (isalnum(str[0]) && (isalnum(str[j]) || str[j] == '_'))
+		return false;
+
+	if (positive_pos && isalnum(str[0]) && (isalnum(str[-1]) || str[-1] == '_'))
 		return false;
 
 	return true;
@@ -49,7 +52,7 @@ find_result find_first(const std::string& str, size_t pos, const KeysArray& key_
 			if (strln - i < key_len)
 				continue;
 
-			if (find_first_impl(c_str + i, g_Keywords[key_index], key_len))
+			if (find_first_impl(c_str + i, g_Keywords[key_index], key_len, i > 0))
 				return find_result{ i, i + key_len, (EKeywords::TYPE)key_index };
 		}
 	}
@@ -73,7 +76,7 @@ find_result find_first(const std::string& str, size_t pos, const KeysArray& key_
 			if (strln - i < key_len)
 				continue;
 
-			if (find_first_impl(c_str + i, g_Keywords[key_index], key_len))
+			if (find_first_impl(c_str + i, g_Keywords[key_index], key_len, i > 0))
 				return find_result{ i, i + key_len, (EKeywords::TYPE)key_index };
 		}
 
@@ -84,7 +87,7 @@ find_result find_first(const std::string& str, size_t pos, const KeysArray& key_
 			if (strln - i < extra_len)
 				continue;
 
-			if (find_first_impl(c_str + i, extras[j].c_str(), extra_len))
+			if (find_first_impl(c_str + i, extras[j].c_str(), extra_len, i > 0))
 				return find_result{ i, i + extra_len, EKeywords::None, j };
 		}
 	}
@@ -108,7 +111,7 @@ find_result find_first_reverse(const std::string& str, size_t pos, const KeysArr
 			if (strln - i < key_len)
 				continue;
 
-			if (find_first_impl(c_str + i, g_Keywords[key_index], key_len))
+			if (find_first_impl(c_str + i, g_Keywords[key_index], key_len, i > 0))
 				return find_result{ i, i + key_len, (EKeywords::TYPE)key_index };
 		}
 	}
@@ -128,7 +131,7 @@ void ParseInheritance(const char* from, const char* to, std::vector<SuperClassNa
 std::string GetName(const char* from, bool reverse = false);
 void ParseNameWithNamespaceBackwards(const char* from, std::string& name, string_vector& namespase, const char* to = nullptr);
 std::string ParseClassNameBackwards(const char* from, const char* to);
-std::string DecorateWithNamespace(const std::string& name, const std::string& classname, const string_vector& namespase);
-void NormalizeLineEndings(std::string& name);
+std::string DecorateWithNamespace(const std::string& name, const string_vector& namespase);
+void NormalizeLineEndings(std::string& text);
 uint GetLineIndex(const std::string& str, size_t pos);
 bool strcmp_range(const char* from, const char* to, const char* what);

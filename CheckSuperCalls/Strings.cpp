@@ -99,6 +99,11 @@ void ParseInheritance(const char* from, const char* to, std::vector<SuperClassNa
 			}
 			else if (c == '/')
 			{
+				if (!str.empty())
+				{
+					super_classes.back().name = str;
+					str.clear();
+				}
 				if (pc[1] == '/')
 				{
 					while (pc != to && *pc != '\n')
@@ -227,7 +232,7 @@ std::string ParseClassNameBackwards(const char* from, const char* to)
 	return name;
 }
 
-std::string DecorateWithNamespace(const std::string& name, const std::string& classname, const string_vector& namespase)
+std::string DecorateWithNamespace(const std::string& name, const string_vector& namespase)
 {
 	std::string result;
 	for (auto& ns : namespase)
@@ -235,15 +240,16 @@ std::string DecorateWithNamespace(const std::string& name, const std::string& cl
 		result += ns + "::";
 	}
 
-	result += classname + "::";
-
 	return result + name;
 }
 
-void NormalizeLineEndings(std::string& name)
+void NormalizeLineEndings(std::string& text)
 {
-	auto p = &name[0];
-	auto e = p + name.length() - 1;
+	if (text.empty())
+		return;
+
+	auto p = &text[0];
+	auto e = p + text.length() - 1;
 	for (; p != e; ++p)
 		if (p[0] == '\r')
 			if (p[1] == '\n')
