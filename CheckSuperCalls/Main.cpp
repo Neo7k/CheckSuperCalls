@@ -194,7 +194,7 @@ int main(int argc, const char* argv[])
 
     auto issues = result.GetAllIssues();
 	for (auto& issue : issues)
-		std::cout << issue->file.string() << "(" << issue->line << "): No super call in " << DecorateWithNamespace(issue->funcname.name, issue->funcname.namespase) << std::endl;
+		std::cout << fs::canonical(issue->file).string() << "(" << issue->line << "): No super call in " << DecorateWithNamespace(issue->funcname.name, issue->funcname.namespase) << std::endl;
 
 #if (VERBOSE)
     std::cout << "===============RESUME====================" << std::endl;
