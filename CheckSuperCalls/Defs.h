@@ -68,6 +68,9 @@ namespace EKeywords
 		EOL,            // \n
 		Quotation,      // "
 
+        _First = Cur,
+        _Last = Quotation,
+
 		None = (uint)-1
 	};
 }
@@ -75,3 +78,4 @@ namespace EKeywords
 extern const char* g_Keywords[];
 extern unsigned char g_KeywordsLengths[];
 
+void InitKeywords();

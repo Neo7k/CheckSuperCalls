@@ -13,6 +13,8 @@ int main(int argc, const char* argv[])
 	if (argc < 2)
 		return 1;
 
+    InitKeywords();
+
 	std::chrono::system_clock timer;
 	auto t00 = timer.now();
 	auto t0 = timer.now();

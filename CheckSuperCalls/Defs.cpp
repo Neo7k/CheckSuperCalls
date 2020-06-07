@@ -1,4 +1,6 @@
-const char* g_Keywords[] =
+#include "Defs.h"
+
+const char* g_Keywords[EKeywords::_Last - EKeywords::_First + 1] =
 {
 	"{",
 	"}",
@@ -23,27 +25,12 @@ const char* g_Keywords[] =
 	"\""
 };
 
-unsigned char g_KeywordsLengths[] =
+unsigned char g_KeywordsLengths[EKeywords::_Last - EKeywords::_First + 1];
+
+void InitKeywords()
 {
-	1,
-	1,
-	9,
-	5,
-	6,
-	1,
-	1,
-	1,
-	1,
-	1,
-	1,
-	10,
-	2,
-	2,
-	7,
-	6,
-	2,
-	2,
-	2,
-	1,
-	1
-};
+    for (uint i = EKeywords::_First; i <= EKeywords::_Last; ++i)
+    {
+        g_KeywordsLengths[i] = (unsigned char)strlen(g_Keywords[i]);
+    }
+}
