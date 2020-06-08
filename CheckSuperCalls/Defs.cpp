@@ -22,7 +22,8 @@ const char* g_Keywords[EKeywords::_Last - EKeywords::_First + 1] =
 	"*/",
 	"//",
 	"\n",
-	"\""
+	"\"",
+    "skip_super"
 };
 
 unsigned char g_KeywordsLengths[EKeywords::_Last - EKeywords::_First + 1];

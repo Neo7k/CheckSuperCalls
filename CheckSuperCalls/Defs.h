@@ -67,9 +67,10 @@ namespace EKeywords
 		SCom,           // //
 		EOL,            // \n
 		Quotation,      // "
+        SkipSuper,      // skip_super
 
         _First = Cur,
-        _Last = Quotation,
+        _Last = SkipSuper,
 
 		None = (uint)-1
 	};

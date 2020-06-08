@@ -183,12 +183,12 @@ void Code::ParseHeaderForBaseClasses(const fs::path& path, const std::string& co
 					}
 
 					// Leaving the class without mutex lock
-					// That should not call the race condition,
+					// That should not cause race condition,
 					// since a single class definition can't be split into different header files
 					// which the threads are working on
 					auto& funcs = clazz->functions;
 					if (Find(funcs, funcname) == funcs.end())
-						clazz->functions.push_back(funcname);
+                        funcs.push_back(funcname);
 
 					pos = fres.pos_end;
 				}
@@ -276,7 +276,8 @@ void Code::ParseHeader(const fs::path& path, const std::string& content, bool sk
 
 	size_t pos = 0;
 	NamespaseStack stack;
-	std::array<uint, 7> search_keys =
+    int attri_stack = 0;
+    std::array<uint, 10> search_keys =
 	{
 		EKeywords::Namespace,
 		EKeywords::Class,
@@ -284,7 +285,10 @@ void Code::ParseHeader(const fs::path& path, const std::string& content, bool sk
 		EKeywords::Cur,
 		EKeywords::Ly,
 		EKeywords::ComStart,
-		EKeywords::SCom
+		EKeywords::SCom,
+        EKeywords::AttriBra,
+        EKeywords::AttriKet,
+        EKeywords::SkipSuper,
 	};
 
 	auto find_res = find_first(content, pos, search_keys);
@@ -386,6 +390,56 @@ void Code::ParseHeader(const fs::path& path, const std::string& content, bool sk
 			stack.Push();
 		else if (find_res.key == EKeywords::Ly)
 			stack.Pop();
+        else if (find_res.key == EKeywords::AttriBra)
+        {
+            ++attri_stack;
+            if (attri_stack > 1)
+                throw ParseException(pos, "Encountered nested [[ ]]");
+        }
+        else if (find_res.key == EKeywords::AttriKet)
+            --attri_stack;
+        else if (find_res.key == EKeywords::SkipSuper && attri_stack == 1)
+        {
+            std::array<uint, 1> atket = { EKeywords::AttriKet };
+            auto fres = find_first(content, pos, atket);
+            if (fres.key == EKeywords::AttriKet)
+            {
+                --attri_stack;
+                pos = fres.pos_end;
+                std::array<uint, 1> par = { EKeywords::Paren };
+                fres = find_first(content, pos, par);
+                if (fres.key == EKeywords::Paren)
+                {
+                    auto funcname = GetName(&content[fres.pos - 1], true);
+                    if (stack.namespase.empty())
+                        throw ParseException(fres.pos, "Expected the function '%s' to be inside of the class", funcname.c_str());
+
+                    auto classname = stack.namespase.back();
+                    if (classname.empty())
+                        throw ParseException(fres.pos, "Empty class name found");
+
+                    Class* clazz;
+                    {
+                        std::lock_guard lock(classes_mutex);
+                        clazz = GetClass(classname, stack.namespase_trunk, string_vector());
+                        if (!clazz)
+                            clazz = CreateClass(classname, stack.namespase_trunk, path);
+                    }
+
+                    // Leaving the class without mutex lock
+                    // That should not cause race condition,
+                    // since a single class definition can't be split into different header files
+                    // which the threads are working on
+                    auto& funcs = clazz->skip_super_functions;
+                    if (Find(funcs, funcname) == funcs.end())
+                        funcs.push_back(funcname);
+
+                    pos = fres.pos_end;
+                }
+                else
+                    throw ParseException(pos, "Expected a '(' in function declaration");
+            }
+        }
 
 		find_res = find_first(content, pos, search_keys);
 	}
@@ -493,6 +547,14 @@ void Code::ParseCpp(int thread_id, const fs::path& path, const std::string& cont
 			auto clazz = GetClass(name, namespase, string_vector());
 			if (clazz)
 			{
+                if (Find(clazz->skip_super_functions, func_name) != clazz->skip_super_functions.end())
+                {
+                    // This function was marked as skip_super
+                    pos = find_res.pos_end;
+                    find_res = find_first(content, pos, com, functions_call_super);
+                    continue;
+                }
+
 				auto super_clazz = FindFuncInSuper(func_name, clazz);
 				if (super_clazz && super_clazz != clazz)
 				{
