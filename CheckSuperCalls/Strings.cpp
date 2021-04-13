@@ -195,7 +195,11 @@ void ParseNameWithNamespaceBackwards(const char* from, std::string& name, string
 std::string ParseClassNameBackwards(const char* from, const char* to)
 {
 	std::string name;
-	name.reserve(from - to);
+    int64 name_size = from - to;
+    if (name_size <= 0)
+        return std::string();
+
+	name.reserve(name_size);
 	auto p = from;
 	bool capturing = false;
 	int template_lvl = 0;

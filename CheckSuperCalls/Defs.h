@@ -21,6 +21,7 @@
 using string_vector = std::vector<std::string>;
 using uint = unsigned int;
 using uchar = unsigned char;
+using int64 = int64_t;
 namespace fs = std::filesystem;
 using FsPaths = std::vector<fs::path>;
 
@@ -67,6 +68,10 @@ namespace EKeywords
 		SCom,           // //
 		EOL,            // \n
 		Quotation,      // "
+        SkipSuper,      // skip_super
+
+        _First = Cur,
+        _Last = SkipSuper,
 
 		None = (uint)-1
 	};
@@ -75,3 +80,4 @@ namespace EKeywords
 extern const char* g_Keywords[];
 extern unsigned char g_KeywordsLengths[];
 
+void InitKeywords();
