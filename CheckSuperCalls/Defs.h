@@ -27,11 +27,11 @@ using FsPaths = std::vector<fs::path>;
 namespace std
 {
 	template<>
-	struct hash<fs::path> : private hash<string>
+	struct hash<fs::path> : private hash<u8string>
 	{
 		size_t operator()(const fs::path& path) const
 		{
-			return hash<string>::operator()(path.u8string());
+			return hash<std::u8string>::operator()(path.u8string());
 		}
 	};
 }
