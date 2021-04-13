@@ -145,7 +145,7 @@ int main(int argc, const char* argv[])
 	std::cout << "===============RESULT====================" << std::endl;
 	auto issues = result.GetAllIssues();
 	for (auto& issue : issues)
-		std::cout << issue->file.string() << "(" << issue->line << "): No super call in " << DecorateWithNamespace(issue->funcname.name, issue->funcname.namespase) << std::endl;
+		std::cout << fs::canonical(issue->file).string() << "(" << issue->line << "): No super call in " << DecorateWithNamespace(issue->funcname.name, issue->funcname.namespase) << std::endl;
 
 	std::cout << "===============RESUME====================" << std::endl;
 	std::cout << "Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(timer.now() - t00).count() << "ms" << std::endl;
