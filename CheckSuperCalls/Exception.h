@@ -14,12 +14,12 @@ public:
 		char buf[buf_size];
 		va_list args;
 		va_start(args, format);
-		sprintf_s(buf, buf_size, format, args);
+		snprintf(buf, buf_size, format, args);
 		va_end(args);
 		message = buf;
 	}
 
-	const char* what() const override
+	const char* what() const throw() override 
 	{
 		return message.c_str();
 	}
