@@ -26,18 +26,6 @@ using int64 = int64_t;
 namespace fs = std::filesystem;
 using FsPaths = std::vector<fs::path>;
 
-namespace std
-{
-	template<>
-	struct hash<fs::path> : private hash<string>
-	{
-		size_t operator()(const fs::path& path) const
-		{
-			return hash<string>::operator()(path.u8string());
-		}
-	};
-}
-
 enum class CodeType
 {
 	Header,

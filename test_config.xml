@@ -8,9 +8,6 @@
             <Skip file="Alfa/SkipThis.cpp"/>
         </Dir>
     </Code>
-    <Options>
-        <Threads num="8"/>
-    </Options>
 	<Annex>
 		<Class name="AActor">
 			<Function name="Tick"/>

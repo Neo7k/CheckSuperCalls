@@ -2,7 +2,9 @@
 #include "Strings.h"
 #include "Config.h"
 
-void Walk(CodeType code_type, const Config& config, const std::function<void(const std::filesystem::path& path)>& functor)
+
+template<typename Func>
+void Walk(CodeType code_type, const Config& config, Func&& functor)
 {
 	namespace fs = std::filesystem;
 	fs::recursive_directory_iterator end;
@@ -70,6 +72,31 @@ void Walk(CodeType code_type, const Config& config, const std::function<void(con
 	}
 }
 
+void CodeFiles::Collect(const Config& config)
+{
+	const uint possible_files_count = 16384; // cuz why not
+
+	Walk(CodeType::Header, config, [&](auto& path) 
+	{
+		headers.emplace_back(path);
+	});
+	
+	Walk(CodeType::Source, config, [&](auto& path) 
+	{
+		source.emplace_back(path);
+	});
+}
+
+const FsPaths& CodeFiles::GetHeaders() const
+{
+	return headers;
+}
+
+const FsPaths& CodeFiles::GetSource() const
+{
+	return source;
+}
+
 bool ReadContent(const std::filesystem::path& path, std::string& content)
 {
 	std::ifstream f(path, std::ios_base::binary);
@@ -83,50 +110,4 @@ bool ReadContent(const std::filesystem::path& path, std::string& content)
 	f.read(&content[0], fsize);
 	NormalizeLineEndings(content);
 	return true;
-}
-
-void CodeFiles::ReadCache(std::ifstream& f)
-{
-	Deserialize(f, file_timestamps);
-}
-
-void CodeFiles::WriteCache(std::ofstream& f) const
-{
-	Serialize(f, file_timestamps);
-}
-
-void CodeFiles::SyncCacheToFiles(const PathTsVec& paths_headers, const PathTsVec& paths_source)
-{
-	auto file_timestamps_copy = file_timestamps;
-	for (auto& f_ts : paths_headers)
-	{
-		auto it = file_timestamps.find(f_ts.path);
-		if (it == file_timestamps.end() || f_ts.timestamp > it->second)
-			changed_headers.push_back(f_ts.path);
-
-		file_timestamps_copy[f_ts.path] = f_ts.timestamp;
-		all_headers.push_back(f_ts.path);
-	}
-
-	for (auto& f_ts : paths_source)
-	{
-		auto it = file_timestamps.find(f_ts.path);
-		if (it == file_timestamps.end() || f_ts.timestamp > it->second)
-			changed_source.push_back(f_ts.path);
-
-		file_timestamps_copy[f_ts.path] = f_ts.timestamp;
-		all_source.push_back(f_ts.path);
-	}
-
-	for (auto&[path, skip] : file_timestamps)
-		if (file_timestamps_copy.find(path) == file_timestamps_copy.end())
-			deleted_files.push_back(path);
-
-	file_timestamps = std::move(file_timestamps_copy);
-}
-
-void CodeFiles::MarkAllChanged()
-{
-	changed_source = all_source;
-	changed_headers = all_headers;
 }

@@ -15,46 +15,6 @@ Code::~Code()
 	classes.clear();
 }
 
-void Code::UpdateCachedData(const CodeFiles& code_files)
-{
-	std::map<fs::path, std::vector<uint>> classes_by_file;
-
-	for (uint i = 0; i < (uint)classes.size(); ++i)
-		classes_by_file[classes[i]->file].push_back(i);
-
-	auto DeleteChangedClasses = [this, &classes_by_file](const fs::path& path)
-	{
-		auto it = classes_by_file.find(path);
-		if (it == classes_by_file.end())
-			return;
-
-		auto& class_indexes = it->second;
-		for (auto class_index : class_indexes)
-		{
-			auto& clazz = classes[class_index];
-
-			for (auto& der_class : clazz->derived_classes)
-				Erase(der_class->super_classes, clazz);
-			for (auto& sup_class : clazz->super_classes)
-				Erase(sup_class->derived_classes, clazz);
-
-			delete clazz;
-			clazz = nullptr;
-		}
-	};
-
-	for (auto& path : code_files.deleted_files)
-		DeleteChangedClasses(path);
-
-	for (auto& path : code_files.changed_headers)
-		DeleteChangedClasses(path);
-
-	for (auto& path : code_files.changed_source)
-		DeleteChangedClasses(path);
-
-	Erase(classes, nullptr);
-}
-
 void Code::ParseLookup(const fs::path& path, const std::string& content)
 {
 	std::array<uint, 2> cl_st = { EKeywords::Class, EKeywords::Struct };
@@ -222,33 +182,6 @@ void Code::ApplyAnnex(const Annex& annex)
 }
 
 void Code::UpdateAllCallSupers()
-{
-	std::set<std::string> old_cs;
-	for (auto& func : functions_call_super)
-		old_cs.insert(func);
-
-
-	std::set<std::string> cs;
-	for (auto clazz : classes)
-	{
-		for (auto& func : clazz->functions)
-			cs.insert(func);
-	}
-
-	for (auto& func : old_cs)
-		if (cs.find(func) == cs.end())
-			functions_call_super_removed.push_back(func);
-	
-	for (auto& func : cs)
-		if (old_cs.find(func) == old_cs.end())
-			functions_call_super_added.push_back(func);
-
-	functions_call_super.clear();
-	for (auto& func : cs)
-		functions_call_super.push_back(func);
-}
-
-void Code::CollectAllCallSupers()
 {
 	std::set<std::string> cs;
 	for (auto clazz : classes)
@@ -601,90 +534,6 @@ void Code::ParseCpp(int thread_id, const fs::path& path, const std::string& cont
 	}
 }
 
-void Code::ReadCache(std::ifstream& f)
-{
-	Deserialize(f, classdef_lookup);
-
-	uint32_t sz;
-	Deserialize(f, sz);
-	classes.resize(sz);
-	for (uint32_t i = 0; i < sz; ++i)
-		classes[i] = new Class;
-
-	for (uint32_t i = 0; i < sz; ++i)
-	{
-		auto clazz = classes[i];
-		Deserialize(f, clazz->name);
-		Deserialize(f, clazz->namespase);
-		Deserialize(f, clazz->functions);
-		Deserialize(f, clazz->file);
-		{
-			size_t sz;
-			Deserialize(f, sz);
-			for (size_t j = 0; j < sz; ++j)
-			{
-				uint32_t id;
-				Deserialize(f, id);
-				if (id >= classes.size())
-					throw Exception("Class with id=%u does not exist", id);
-
-				clazz->super_classes.push_back(classes[id]);
-			}
-		}
-		{
-			size_t sz;
-			Deserialize(f, sz);
-			for (size_t j = 0; j < sz; ++j)
-			{
-				uint32_t id;
-				Deserialize(f, id);
-				if (id >= classes.size())
-					throw Exception("Class with id=%u does not exist", id);
-
-				clazz->derived_classes.push_back(classes[id]);
-			}
-		}
-	}
-
-	CollectAllCallSupers();
-}
-
-void Code::WriteCache(std::ofstream& f) const
-{
-	Serialize(f, classdef_lookup);
-
-	uint32_t sz = (uint32_t)classes.size();
-	Serialize(f, sz);
-	for (uint32_t i = 0; i < sz; ++i)
-	{
-		auto clazz = classes[i];
-		Serialize(f, clazz->name);
-		Serialize(f, clazz->namespase);
-		Serialize(f, clazz->functions);
-		Serialize(f, clazz->file);
-		Serialize(f, clazz->super_classes.size());
-		for (auto super_clazz : clazz->super_classes)
-		{
-			auto it = Find(classes, super_clazz);
-			if (it == classes.end())
-				throw Exception("Class is not registered");
-
-			uint32_t id = (uint32_t)(it - classes.begin());
-			Serialize(f, id);
-		}
-		Serialize(f, clazz->derived_classes.size());
-		for (auto derived_clazz : clazz->derived_classes)
-		{
-			auto it = Find(classes, derived_clazz);
-			if (it == classes.end())
-				throw Exception("Class is not registered");
-
-			uint32_t id = (uint32_t)(it - classes.begin());
-			Serialize(f, id);
-		}
-	}
-}
-
 size_t Code::GetClassLookupSize() const
 {
 	return classdef_lookup.size();
@@ -700,19 +549,9 @@ size_t Code::GetCSFunctionsCount() const
 	return functions_call_super.size();
 }
 
-bool Code::DidCSFunctionsChange() const
+const string_vector& Code::GetCSFunctions() const
 {
-	return !functions_call_super_added.empty() || !functions_call_super_removed.empty();
-}
-
-const string_vector& Code::GetCSFunctionsAdded() const
-{
-	return functions_call_super_added;
-}
-
-const string_vector& Code::GetCSFunctionsRemoved() const
-{
-	return functions_call_super_removed;
+	return functions_call_super;
 }
 
 Class* Code::GetClass(const std::string& name, const string_vector& namespase, const string_vector& possible_namespase) const

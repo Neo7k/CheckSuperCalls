@@ -96,18 +96,6 @@ bool Config::ParseConfig(const std::filesystem::path& path)
 		file_elem = file_elem->NextSiblingElement("File");
 	}
 
-	auto options_elem = root->FirstChildElement("Options");
-	if (options_elem)
-	{
-		auto threads_elem = options_elem->FirstChildElement("Threads");
-		if (threads_elem)
-			num_threads = threads_elem->IntAttribute("num", 1);
-
-		auto cache_elem = options_elem->FirstChildElement("Cache");
-		if (cache_elem)
-			cache_path = GetPath(path, cache_elem->Attribute("path"));
-	}
-
 	auto annex_elem = root->FirstChildElement("Annex");
 	if (annex_elem)
 		annex_path = GetPath(path, annex_elem->Attribute("path"));
@@ -123,16 +111,6 @@ const string_vector& Config::GetExt(CodeType type) const
 const std::vector<Parse>& Config::GetParseStructure() const
 {
 	return parse;
-}
-
-int Config::GetNumThreads() const
-{
-	return num_threads;
-}
-
-const fs::path& Config::GetCachePath() const
-{
-	return cache_path;
 }
 
 const fs::path& Config::GetAnnexPath() const

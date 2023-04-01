@@ -42,16 +42,9 @@ public:
 	void AddIssue(Issue* issue, int thread_id);
 	IssuesVec GetAllIssues() const;
 
-	void ReadCache(std::ifstream& f);
-	void WriteCache(std::ofstream& f) const;
-
-	void UpdateCachedData(const CodeFiles& code_files);
-
 	void Clear();
-	void EraseCachedIssues(const FuncName& root_func);
 
 protected:
 
 	std::vector<IssuesVec> issues;
-	IssuesVec cached_issues;
 };

@@ -33,59 +33,21 @@ int main(int argc, const char* argv[])
 	annex.Parse(config.GetAnnexPath());
 
 	Code code;
-	Result result(config.GetNumThreads());
+	const uint num_threads = std::thread::hardware_concurrency();
+	Result result(num_threads);
 	CodeFiles files;
-
-#if (VERBOSE)
-	std::cout << "==============CACHE PHASE==============" << std::endl;
-#endif
+	files.Collect(config);
 
 	t0 = timer.now();
-	{
-		std::ifstream f(config.GetCachePath(), std::ios::binary);
-		if (f)
-		{
-			files.ReadCache(f);
-			code.ReadCache(f);
-			result.ReadCache(f);
-		}
-	}
 
-	const uint possible_files_count = 16384; // cuz why not
-	PathTsVec header_files; header_files.reserve(possible_files_count);
-	PathTsVec source_files; source_files.reserve(possible_files_count);
-
-	Walk(CodeType::Header, config, [&](auto& path) 
-	{
-		header_files.emplace_back(PathTs{path, fs::last_write_time(path)});
-	});
-
-	Walk(CodeType::Source, config, [&](auto& path) 
-	{
-		source_files.emplace_back(PathTs{path, fs::last_write_time(path)});
-	});
-
-	files.SyncCacheToFiles(header_files, source_files);
-	code.UpdateCachedData(files);
-	result.UpdateCachedData(files);
-
-#if (VERBOSE)
-	std::cout << "Files: " << std::endl;
-	std::cout << "|--overall: " << header_files.size() + source_files.size() << std::endl;
-	std::cout << "|--changed: " << files.changed_headers.size() + files.changed_source.size() << std::endl;
-	std::cout << "|--deleted: " << files.deleted_files.size() << std::endl;
-	std::cout << "Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(timer.now() - t0).count() << "ms" << std::endl;
-	t0 = timer.now();
-#endif
-
-	Workers workers(config.GetNumThreads());
-	workers.SetPaths(&files.changed_headers);
+	Workers workers(num_threads);
+	workers.SetPaths(&files.GetHeaders());
 
 #if (VERBOSE)
 	std::cout << "==============LOOKUP PHASE==============" << std::endl;
 #endif
 
-	workers.DoJob([&](int thread_index, auto& path)
+	workers.DoJob([&code](int thread_index, auto& path)
 	{
 		std::string content;
 		if (ReadContent(path, content))
@@ -103,7 +65,7 @@ int main(int argc, const char* argv[])
     std::cout << "========BASE SEARCH PHASE===============" << std::endl;
 #endif
 
-    workers.DoJob([&](int thread_index, auto& path)
+    workers.DoJob([&code](int thread_index, auto& path)
 	{
 		std::string content;
 		if (ReadContent(path, content))
@@ -116,33 +78,6 @@ int main(int argc, const char* argv[])
     std::cout << "Classes: " << code.GetClassesCount() << std::endl;
 	std::cout << "Super Functions: " << code.GetCSFunctionsCount() << std::endl;
 #endif
-
-    if (code.DidCSFunctionsChange())
-	{
-		
-#if (VERBOSE)
-        std::cout << "Super Functions have changed:" << std::endl;
-		std::cout << "|--added: " << code.GetCSFunctionsAdded().size() << std::endl;
-		std::cout << "|--deleted: " << code.GetCSFunctionsRemoved().size() << std::endl;
-#endif
-
-		if (!code.GetCSFunctionsAdded().empty())
-		{
-#if (VERBOSE)
-            std::cout << "... performing full rebuild" << std::endl;
-#endif
-            files.MarkAllChanged();
-			result.Clear();
-		}
-		else if (!code.GetCSFunctionsRemoved().empty())
-		{
-#if (VERBOSE)
-            std::cout << "... cleaning removed functions from the result cache" << std::endl;
-#endif
-            // TODO:
-			//result.EraseCachedIssues(code.GetCSFunctionsRemoved());
-		}
-	}
 
 #if (VERBOSE)
     std::cout << "Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(timer.now() - t0).count() << "ms" << std::endl;
@@ -165,7 +100,7 @@ int main(int argc, const char* argv[])
     std::cout << "=========HEADER PARSE PHASE=============" << std::endl;
 #endif
 
-    workers.DoJob([&](int thread_index, auto& path)
+    workers.DoJob([&code](int thread_index, auto& path)
 	{
 		std::string content;
 		FsPaths paths;
@@ -184,8 +119,8 @@ int main(int argc, const char* argv[])
     std::cout << "========SOURCE PARSE PHASE==============" << std::endl;
 #endif
 
-	workers.SetPaths(&files.changed_source);
-	workers.DoJob([&](int thread_index, auto& path)
+	workers.SetPaths(&files.GetSource());
+	workers.DoJob([&code, &result](int thread_index, auto& path)
 	{
 		std::string content;
 		if (ReadContent(path, content))
@@ -208,16 +143,6 @@ int main(int argc, const char* argv[])
     std::cout << "===============RESUME====================" << std::endl;
 	std::cout << "Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(timer.now() - t00).count() << "ms" << std::endl;
 #endif
-
-	{
-		std::ofstream f(config.GetCachePath(), std::ios::binary);
-		if (f)
-		{
-			files.WriteCache(f);
-			code.WriteCache(f);
-			result.WriteCache(f);
-		}
-	}
 
 	return 0;
 }

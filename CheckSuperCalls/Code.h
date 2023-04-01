@@ -12,7 +12,6 @@ public:
 
 	virtual ~Code();
 
-	void UpdateCachedData(const CodeFiles& code_files);
 	void ParseLookup(const fs::path& path, const std::string& content);
 	void ParseHeaderForBaseClasses(const fs::path& path, const std::string& content);
 	void ApplyAnnex(const Annex& annex);
@@ -20,16 +19,11 @@ public:
 	void ParseHeader(const fs::path& path, const std::string& content, bool skip_if_no_target_funcs, FsPaths& parsed_paths);
 	void ParseCpp(int thread_id, const fs::path& path, const std::string& content, Result& results);
 
-	void ReadCache(std::ifstream& f);
-	void WriteCache(std::ofstream& f) const;
-
 	size_t GetClassLookupSize() const;
 	size_t GetClassesCount() const;
 	size_t GetCSFunctionsCount() const;
 
-	bool DidCSFunctionsChange() const;
-	const string_vector& GetCSFunctionsAdded() const;
-	const string_vector& GetCSFunctionsRemoved() const;
+	const string_vector& GetCSFunctions() const;
 
 protected:
 
@@ -62,8 +56,6 @@ protected:
 	//}
 
 	string_vector functions_call_super;
-	string_vector functions_call_super_removed;
-	string_vector functions_call_super_added;
 
 	std::mutex classdef_lookup_mutex;
 	//{
