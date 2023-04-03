@@ -103,7 +103,7 @@ bool Config::ParseConfig(const std::filesystem::path& path)
 	return true;
 }
 
-const string_vector& Config::GetExt(CodeType type) const
+const std::vector<fs::path>& Config::GetExt(CodeType type) const
 {
 	return type == CodeType::Header ? header_ext : source_ext;
 }

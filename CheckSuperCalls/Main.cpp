@@ -12,7 +12,7 @@ int main(int argc, const char* argv[])
 {
     if (argc < 2)
     {
-        std::cerr << "Usage: CheckSuperCalls config.xml" << std::endl;
+        std::cerr << "Usage: CheckSuperCalls {path to code|path to .paths file}" << std::endl;
         return 1;
     }
 
@@ -23,11 +23,6 @@ int main(int argc, const char* argv[])
 	auto t0 = timer.now();
 
 	Config config;
-    if (!config.ParseConfig(argv[1]))
-    {
-        std::cerr << "Can't parse config at " << argv[1] << std::endl;
-        return 1;
-    }
 
 	Annex annex;
 	annex.Parse(config.GetAnnexPath());
@@ -35,8 +30,7 @@ int main(int argc, const char* argv[])
 	Code code;
 	const uint num_threads = std::thread::hardware_concurrency();
 	Result result(num_threads);
-	CodeFiles files;
-	files.Collect(config);
+	CodeFiles files(fs::path(argv[1]), config);
 
 	t0 = timer.now();
 

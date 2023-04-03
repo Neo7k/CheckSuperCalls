@@ -4,22 +4,17 @@
 
 class Config;
 
-struct PathTs
-{
-	fs::path path;
-	fs::file_time_type timestamp;
-};
-
-using PathTsVec = std::vector<PathTs>;
-
 struct CodeFiles
 {
-	void Collect(const Config& config);
+	CodeFiles(const fs::path& path, const Config& config);
 
 	const FsPaths& GetHeaders() const;
 	const FsPaths& GetSource() const;
 
 protected:
+
+	
+
 
 	FsPaths headers;
 	FsPaths source;
