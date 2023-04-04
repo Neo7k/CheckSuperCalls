@@ -287,6 +287,10 @@ CodeFiles::CodeFiles(const fs::path& path, const Config& config)
 		UnrollTree(path_tree.get());
 	}
 
+	const size_t files_num = 0x4000;
+	headers.reserve(files_num);
+	source.reserve(files_num);
+
 	Walk(path_tree.get(), [&config, this](auto& path) 
 		{
 			auto source_ext = config.GetExt(CodeType::Header);
@@ -307,6 +311,9 @@ CodeFiles::CodeFiles(const fs::path& path, const Config& config)
 				}
 			}
 		});
+
+	headers.shrink_to_fit();
+	source.shrink_to_fit();
 }
 
 const FsPaths& CodeFiles::GetHeaders() const
