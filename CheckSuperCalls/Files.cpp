@@ -52,7 +52,7 @@ namespace
 				continue; // indented empty line
 
 			if (line_indent - indent > 1)
-				throw Exception("Invalid indentation of the path: %s", line.c_str());
+				throw Exception(std::format("Invalid indentation of the path: {}", line));
 
 			if (line_indent - indent > 0)
 				current_node = current_node->children.back().get();
@@ -74,7 +74,7 @@ namespace
 				mode = PathNode::Skip;
 			}
 			else
-				throw Exception("Expected + or - at the beginning of the path: %s", line.c_str());
+				throw Exception(std::format("Expected + or - at the beginning of the path: {}", line));
 
 			auto new_node = std::make_unique<PathNode>();
 
@@ -261,12 +261,12 @@ namespace
 }
 
 
-CodeFiles::CodeFiles(const fs::path& path, const Config& config) 
+CodeFiles::CodeFiles(const fs::path& path, const Config& config)
 {
 	// Now this can be either a path to the directory with the code
 	// or a path to the file with the directories structure description
 	if (!fs::exists(path))
-		throw Exception("Path %s does not exist", path.c_str());
+		throw Exception(std::format("Path {} does not exist", path.string()));
 
 	PathNode::Ptr path_tree;
 	if (fs::is_directory(path))

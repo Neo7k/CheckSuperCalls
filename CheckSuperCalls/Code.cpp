@@ -128,11 +128,11 @@ void Code::ParseHeaderForBaseClasses(const fs::path& path, const std::string& co
 				{
 					auto funcname = GetName(&content[fres.pos - 1], true);
 					if (stack.namespase.empty())
-						throw ParseException(fres.pos, "Expected the function '%s' to be inside of the class", funcname.c_str());
+						throw ParseException(path, fres.pos, std::format("Expected the function '{}' to be inside of the class", funcname));
 
 					auto classname = stack.namespase.back();
 					if (classname.empty())
-						throw ParseException(fres.pos, "Empty class name found");
+						throw ParseException(path, fres.pos, "Empty class name found");
 
 					Class* clazz;
 					{
@@ -153,14 +153,14 @@ void Code::ParseHeaderForBaseClasses(const fs::path& path, const std::string& co
 					pos = fres.pos_end;
 				}
 				else
-					throw ParseException(pos, "Expected a '(' in function declaration");
+					throw ParseException(path, pos, "Expected a '(' in function declaration");
 			}
 		}
 		else if (find_res.key == EKeywords::AttriBra)
 		{
 			++attri_stack;
 			if (attri_stack > 1)
-				throw ParseException(pos, "Encountered nested [[ ]]");
+				throw ParseException(path, pos, "Encountered nested [[ ]]");
 		}
 		else if (find_res.key == EKeywords::AttriKet)
 			--attri_stack;
@@ -246,7 +246,7 @@ void Code::ParseHeader(const fs::path& path, const std::string& content, bool sk
 				{
 					auto classname = ParseClassNameBackwards(&content[fres.pos - 1], &content[pos]);
 					if (classname.empty())
-						throw ParseException(fres.pos, "Empty class name found");
+						throw ParseException(path, fres.pos, "Empty class name found");
 
 					string_vector pos_ns;
 					Class* clazz = nullptr;
@@ -327,7 +327,7 @@ void Code::ParseHeader(const fs::path& path, const std::string& content, bool sk
         {
             ++attri_stack;
             if (attri_stack > 1)
-                throw ParseException(pos, "Encountered nested [[ ]]");
+                throw ParseException(path, pos, "Encountered nested [[ ]]");
         }
         else if (find_res.key == EKeywords::AttriKet)
             --attri_stack;
@@ -345,11 +345,11 @@ void Code::ParseHeader(const fs::path& path, const std::string& content, bool sk
                 {
                     auto funcname = GetName(&content[fres.pos - 1], true);
                     if (stack.namespase.empty())
-                        throw ParseException(fres.pos, "Expected the function '%s' to be inside of the class", funcname.c_str());
+                        throw ParseException(path, fres.pos, std::format("Expected the function '{}' to be inside of the class", funcname));
 
                     auto classname = stack.namespase.back();
                     if (classname.empty())
-                        throw ParseException(fres.pos, "Empty class name found");
+                        throw ParseException(path, fres.pos, "Empty class name found");
 
                     Class* clazz;
                     {
@@ -370,7 +370,7 @@ void Code::ParseHeader(const fs::path& path, const std::string& content, bool sk
                     pos = fres.pos_end;
                 }
                 else
-                    throw ParseException(pos, "Expected a '(' in function declaration");
+                    throw ParseException(path, pos, "Expected a '(' in function declaration");
             }
         }
 
@@ -500,7 +500,7 @@ void Code::ParseCpp(int thread_id, const fs::path& path, const std::string& cont
 					while (stack > 0)
 					{
 						if (!func_find_res)
-							throw ParseException(pos, "Can't find the end of the function '%s'", func_name.c_str());
+							throw ParseException(path, pos, std::format("Can't find the end of the function '{}'", func_name));
 
 						if (SkipComments(func_find_res.key, content, pos))
 						{
