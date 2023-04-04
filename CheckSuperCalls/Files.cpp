@@ -307,12 +307,6 @@ CodeFiles::CodeFiles(const fs::path& path, const Config& config)
 				}
 			}
 		});
-
-	std::ofstream f("files.txt");
-	for (auto& s : headers)
-		f << fs::canonical(s) << std::endl;
-	for (auto& s : source)
-		f << fs::canonical(s) << std::endl;
 }
 
 const FsPaths& CodeFiles::GetHeaders() const
