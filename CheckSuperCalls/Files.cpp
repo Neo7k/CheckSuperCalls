@@ -235,7 +235,7 @@ namespace
 			if (paths.size() > 1)
 			{
 				std::string root(paths[0]);
-				std::string child(paths[1]);
+				std::string child(node->path.substr(root.length() + 1));
 				PathNode::Mode old_mode = node->mode;
 
 				node->path = root;
@@ -307,6 +307,12 @@ CodeFiles::CodeFiles(const fs::path& path, const Config& config)
 				}
 			}
 		});
+
+	std::ofstream f("files.txt");
+	for (auto& s : headers)
+		f << fs::canonical(s) << std::endl;
+	for (auto& s : source)
+		f << fs::canonical(s) << std::endl;
 }
 
 const FsPaths& CodeFiles::GetHeaders() const
