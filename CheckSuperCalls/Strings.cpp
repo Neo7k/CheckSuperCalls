@@ -262,3 +262,29 @@ void NormalizeLineEndings(std::string& text)
 				p[0] = '\n';
 
 }
+
+std::vector<std::string_view> Tokenize(std::string_view str, char delim, uint max_elems/* = std::numeric_limits<uint>::max()*/)
+{
+	if (max_elems < 1)
+		max_elems = 1;
+
+	std::vector<std::string_view> result;
+	result.reserve(std::ranges::count(str, delim));
+	size_t pos = 0;
+	while (pos < str.length())
+	{
+		size_t tok = str.find(delim, pos);
+		if (tok != std::string_view::npos && result.size() < max_elems - 1)
+		{
+			result.push_back(str.substr(pos, tok - pos));
+			pos = tok + 1;
+		}
+		else
+		{
+			result.push_back(str.substr(pos));
+			break;
+		}
+	}
+
+	return result;
+}

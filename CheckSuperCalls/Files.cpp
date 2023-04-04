@@ -5,7 +5,7 @@
 
 namespace
 {
-	void UnifySeparators(std::string& path)
+	void NormalizeSeparators(std::string& path)
 	{
 		std::ranges::replace(path, '\\', '/');
 	}
@@ -204,38 +204,15 @@ namespace
 		}
 	}
 
-	std::vector<std::string_view> Tokenize(std::string_view str, char token)
-	{
-		std::vector<std::string_view> result;
-		result.reserve(std::ranges::count(str, token));
-		size_t pos = 0;
-		while (true)
-		{
-			size_t tok = str.find(token, pos);
-			if (tok != std::string_view::npos)
-			{
-				result.push_back(str.substr(pos, tok - pos));
-				pos = tok + 1;
-			}
-			else
-			{
-				result.push_back(str.substr(pos));
-				break;
-			}
-		}
-
-		return result;
-	}
-
 	void UnrollTree(PathNode* node)
 	{
 		if (fs::path(node->path).is_relative())
 		{
-			auto paths = Tokenize(node->path, '/');
+			auto paths = Tokenize(node->path, '/', 2);
 			if (paths.size() > 1)
 			{
 				std::string root(paths[0]);
-				std::string child(node->path.substr(root.length() + 1));
+				std::string child(paths[1]);
 				PathNode::Mode old_mode = node->mode;
 
 				node->path = root;
@@ -273,7 +250,7 @@ CodeFiles::CodeFiles(const fs::path& path, const Config& config)
 	{
 		path_tree.reset(new PathNode);
 		auto path_str = fs::canonical(path).string();
-		UnifySeparators(path_str);
+		NormalizeSeparators(path_str);
 		path_tree->path = path_str;
 
 		auto child = new PathNode;

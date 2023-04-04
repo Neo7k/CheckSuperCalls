@@ -18,6 +18,8 @@
 #include <fstream>
 #include <functional>
 #include <filesystem>
+#include <charconv>
+#include <ranges>
 
 using string_vector = std::vector<std::string>;
 using uint = unsigned int;
