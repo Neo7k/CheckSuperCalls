@@ -5,7 +5,7 @@
 
 namespace
 {
-	void UnifySeparators(std::string& path)
+	void NormalizeSeparators(std::string& path)
 	{
 		std::ranges::replace(path, '\\', '/');
 	}
@@ -52,7 +52,7 @@ namespace
 				continue; // indented empty line
 
 			if (line_indent - indent > 1)
-				throw Exception("Invalid indentation of the path: %s", line.c_str());
+				throw Exception(std::format("Invalid indentation of the path: {}", line));
 
 			if (line_indent - indent > 0)
 				current_node = current_node->children.back().get();
@@ -74,7 +74,7 @@ namespace
 				mode = PathNode::Skip;
 			}
 			else
-				throw Exception("Expected + or - at the beginning of the path: %s", line.c_str());
+				throw Exception(std::format("Expected + or - at the beginning of the path: {}", line));
 
 			auto new_node = std::make_unique<PathNode>();
 
@@ -226,34 +226,11 @@ namespace
 		}
 	}
 
-	std::vector<std::string_view> Tokenize(std::string_view str, char token)
-	{
-		std::vector<std::string_view> result;
-		result.reserve(std::ranges::count(str, token));
-		size_t pos = 0;
-		while (true)
-		{
-			size_t tok = str.find(token, pos);
-			if (tok != std::string_view::npos)
-			{
-				result.push_back(str.substr(pos, tok - pos));
-				pos = tok + 1;
-			}
-			else
-			{
-				result.push_back(str.substr(pos));
-				break;
-			}
-		}
-
-		return result;
-	}
-
 	void UnrollTree(PathNode* node)
 	{
 		if (fs::path(node->path).is_relative())
 		{
-			auto paths = Tokenize(node->path, '/');
+			auto paths = Tokenize(node->path, '/', 2);
 			if (paths.size() > 1)
 			{
 				std::string root(paths[0]);
@@ -283,19 +260,19 @@ namespace
 }
 
 
-CodeFiles::CodeFiles(const fs::path& path, const Config& config) 
+CodeFiles::CodeFiles(const fs::path& path, const Config& config)
 {
 	// Now this can be either a path to the directory with the code
 	// or a path to the file with the directories structure description
 	if (!fs::exists(path))
-		throw Exception("Path %s does not exist", path.c_str());
+		throw Exception(std::format("Path {} does not exist", path.string()));
 
 	PathNode::Ptr path_tree;
 	if (fs::is_directory(path))
 	{
 		path_tree.reset(new PathNode);
 		auto path_str = fs::canonical(path).string();
-		UnifySeparators(path_str);
+		NormalizeSeparators(path_str);
 		path_tree->path = path_str;
 
 		auto child = new PathNode;
@@ -308,6 +285,10 @@ CodeFiles::CodeFiles(const fs::path& path, const Config& config)
 		path_tree = ParseFilesConf(path);
 		UnrollTree(path_tree.get());
 	}
+
+	const size_t files_num = 0x4000;
+	headers.reserve(files_num);
+	source.reserve(files_num);
 
 	Walk(path_tree.get(), [&config, this](auto& path) 
 		{
@@ -329,6 +310,9 @@ CodeFiles::CodeFiles(const fs::path& path, const Config& config)
 				}
 			}
 		});
+
+	headers.shrink_to_fit();
+	source.shrink_to_fit();
 }
 
 const FsPaths& CodeFiles::GetHeaders() const

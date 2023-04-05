@@ -1,106 +1,39 @@
-#include <sstream>
 #include "Config.h"
 #include "Strings.h"
-#include "tinyxml2.h"
+#include "Exception.h"
 
-bool Config::ParseConfig(const std::filesystem::path& path)
+Config::Config(const fs::path& path)
 {
-	using namespace tinyxml2;
+	if (!fs::exists(path))
+		throw Exception(std::format("Path {} doesn't exit", path.string()));
 
-	XMLDocument xml_doc;
-	if (xml_doc.LoadFile(path.string().c_str()) != tinyxml2::XML_SUCCESS)
-		return false;
-
-	auto root = xml_doc.FirstChild();
-	if (!root)
-		return false;
-
-	auto code_elem = root->FirstChildElement("Code");
-	if (!code_elem)
-		return false;
-
-	auto headers_elem = code_elem->FirstChildElement("Headers");
-	if (!headers_elem)
-		return false;
-
-	if (auto ext_c = headers_elem->Attribute("ext"))
+	std::ifstream f(path);
+	while (!f.eof())
 	{
-		std::istringstream s(ext_c);
-		std::string ext;
-		while (getline(s, ext, '|'))
-		{
-			header_ext.push_back(ext);
-		}
-	}
-	else
-		return false;
-
-	auto source_elem = code_elem->FirstChildElement("Source");
-	if (!source_elem)
-		return false;
-
-	if (auto ext_c = source_elem->Attribute("ext"))
-	{
-		std::istringstream s(ext_c);
-		std::string ext;
-		while (getline(s, ext, '|'))
-		{
-			source_ext.push_back(ext);
-		}
-	}
-	else
-		return false;
-
-
-	auto dir_elem = code_elem->FirstChildElement("Dir");
-	while (dir_elem)
-	{
-		fs::path scan_path = GetPath(path, dir_elem->Attribute("path"));
-		if (fs::exists(scan_path))
-		{
-			auto& p = parse.emplace_back();
-			p.dir = scan_path;
-		}
-		else
-		{
-			dir_elem = dir_elem->NextSiblingElement("Dir");
+		std::string line;
+		std::getline(f, line);
+		
+		auto tokens = Tokenize(line, '=');
+		if (tokens.size() < 2)
 			continue;
-		}
 
-		auto skip_elem = dir_elem->FirstChildElement("Skip");
-		while (skip_elem)
+		auto&& read_extensions = [](auto& exts, const auto& token)
 		{
-			auto& s = parse.back().skip.emplace_back();
-			if (auto skip_dir = skip_elem->Attribute("dir"))
-				s.dir = skip_dir;
-			else if (auto skip_file = skip_elem->Attribute("file"))
-				s.file = skip_file;
+			auto filtered_token = token | std::views::filter([](char c) {return c != '"'; });
+			std::string str(std::begin(filtered_token), std::end(filtered_token));
+			auto extensions = Tokenize(str, '|');
+			exts.clear();
+			for (auto& ext : extensions)
+				exts.emplace_back(ext);
+		};
 
-			skip_elem = skip_elem->NextSiblingElement("Skip");
-		}
-
-		dir_elem = dir_elem->NextSiblingElement("Dir");
+		if (tokens[0] == "verbose")
+			std::from_chars(tokens[1].data(), tokens[1].data() + tokens[1].size(), verbosity);
+		else if (tokens[0] == "headers")
+			read_extensions(header_ext, tokens[1]);
+		else if (tokens[1] == "source")
+			read_extensions(source_ext, tokens[1]);
 	}
-
-	auto file_elem = code_elem->FirstChildElement("File");
-	while (file_elem)
-	{
-		fs::path scan_path = GetPath(path, file_elem->Attribute("path"));
-
-		if (fs::exists(scan_path))
-		{
-			auto& p = parse.emplace_back();
-			p.file = scan_path;
-		}
-
-		file_elem = file_elem->NextSiblingElement("File");
-	}
-
-	auto annex_elem = root->FirstChildElement("Annex");
-	if (annex_elem)
-		annex_path = GetPath(path, annex_elem->Attribute("path"));
-
-	return true;
 }
 
 const std::vector<fs::path>& Config::GetExt(CodeType type) const
@@ -108,26 +41,7 @@ const std::vector<fs::path>& Config::GetExt(CodeType type) const
 	return type == CodeType::Header ? header_ext : source_ext;
 }
 
-const std::vector<Parse>& Config::GetParseStructure() const
+int Config::GetVerbosity() const
 {
-	return parse;
-}
-
-const fs::path& Config::GetAnnexPath() const
-{
-	return annex_path;
-}
-
-fs::path Config::GetPath(const std::filesystem::path& conf_path, const char* path_text) const
-{
-	if (!path_text)
-		return fs::path();
-
-	fs::path path(path_text);
-	if (!path.is_relative())
-		return path;
-
-	auto full_path = fs::absolute(conf_path).parent_path();
-	full_path /= path;
-	return full_path;
+	return verbosity;
 }

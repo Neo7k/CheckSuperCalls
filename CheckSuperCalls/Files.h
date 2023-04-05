@@ -13,9 +13,6 @@ struct CodeFiles
 
 protected:
 
-	
-
-
 	FsPaths headers;
 	FsPaths source;
 };

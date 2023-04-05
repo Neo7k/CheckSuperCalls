@@ -135,3 +135,4 @@ std::string DecorateWithNamespace(const std::string& name, const string_vector& 
 void NormalizeLineEndings(std::string& text);
 uint GetLineIndex(const std::string& str, size_t pos);
 bool strcmp_range(const char* from, const char* to, const char* what);
+std::vector<std::string_view> Tokenize(std::string_view str, char token, uint max_elems = std::numeric_limits<uint>::max());
