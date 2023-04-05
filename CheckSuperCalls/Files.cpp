@@ -173,7 +173,7 @@ namespace
 	}
 
 	template<typename Func>
-	void WalkImpl(const fs::path& path, PathNode* node, Func&& func)
+	void WalkImpl(const fs::path& path, PathNode* node, const Func& func)
 	{
 		if (node && node->mode == PathNode::Skip && node->children.empty())
 			return;
@@ -193,7 +193,7 @@ namespace
 					{
 						if (Match(child_path.filename().string(), child->path))
 						{
-							WalkImpl(child_path, child.get(), std::forward<Func>(func));
+							WalkImpl(child_path, child.get(), func);
 							rule_applied = true;
 							break;
 						}
@@ -203,7 +203,7 @@ namespace
 				if (!rule_applied)
 				{
 					if (!node || node->mode == PathNode::Add)
-						WalkImpl(child_path, nullptr, std::forward<Func>(func));
+						WalkImpl(child_path, nullptr, func);
 				}
 			}
 		}
@@ -211,7 +211,7 @@ namespace
 	}
 
 	template<typename Func>
-	void Walk(PathNode* path_tree, Func&& func)
+	void Walk(PathNode* path_tree, const Func& func)
 	{
 		for (auto& path_node : path_tree->children)
 		{
@@ -222,7 +222,7 @@ namespace
 				path = root / path;
 			}
 
-			WalkImpl(path, path_node.get(), std::forward<Func>(func));
+			WalkImpl(path, path_node.get(), func);
 		}
 	}
 
