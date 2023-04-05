@@ -10,19 +10,19 @@ namespace alpha
 		{
 		public:
 		
-			[[using gnu : const, always_inline, hot]] [[nodiscard, call_super]]
+			[[using gnu : const, always_inline, hot]] [[nodiscard, csc::call_super]]
 			virtual int Func_Super() const = 0;
 			
-			// [[nodiscard, call_super]]
+			// [[nodiscard, csc::call_super]]
 			virtual void Func_NoSuper() const throw();
 			
-			[[call_super]]
+			[[csc::call_super]]
 			void Func_NonVirtual();
 			
 			//***********Some comment*********//
-			/*[[call_super]] void Func_CommentedOut();
+			/*[[csc::call_super]] void Func_CommentedOut();
 			*/
-			[[nodiscard]][[call_super]]
+			[[nodiscard]][[csc::call_super]]
 			virtual int Func_HeaderDefined()
 			{
 				//...
@@ -37,11 +37,11 @@ namespace alpha
 			
 			struct Nested
 			{
-				[[call_super]]
+				[[csc::call_super]]
 				virtual void Func_Nested();
 			};
 			
-			[[call_super]]
+			[[csc::call_super]]
 			virtual std::vector<int> Func_Super_II();
 		};
 	}

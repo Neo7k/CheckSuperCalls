@@ -37,7 +37,7 @@ namespace alpha
 		
 		int Func_Super() const;
 		
-		[[call_super]]
+		[[csc::call_super]]
 		void Func_1();
 	};
 }

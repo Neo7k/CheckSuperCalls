@@ -13,7 +13,7 @@ const char* g_Keywords[EKeywords::_Last - EKeywords::_First + 1] =
 	":",
 	"<",
 	">",
-	"call_super",
+	"csc::call_super",
 	"[[",
 	"]]",
 	"__super",
@@ -23,7 +23,7 @@ const char* g_Keywords[EKeywords::_Last - EKeywords::_First + 1] =
 	"//",
 	"\n",
 	"\"",
-    "skip_super"
+    "csc::skip_super"
 };
 
 unsigned char g_KeywordsLengths[EKeywords::_Last - EKeywords::_First + 1];
