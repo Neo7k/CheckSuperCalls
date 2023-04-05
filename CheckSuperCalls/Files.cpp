@@ -89,65 +89,87 @@ namespace
 	}
 
 
-	template <typename T>
-	bool MatchImpl(T it_txt, T it_ptn)
-	{
-		constexpr int no_char = -1;
-		auto&& get = [](auto& its_pair)
-		{
-			if (its_pair.first != its_pair.second)
-				return (int)(unsigned char)*its_pair.first;
-			return no_char;
-		};
-
-		auto&& inc = [](auto& its_pair)
-		{
-			if (its_pair.first != its_pair.second)
-			{
-				++its_pair.first;
-				return true;
-			}
-			return false;
-		};
-
-		bool wildcart = false;
-		while (true)
-		{
-			if (get(it_ptn) == '*')
-			{
-				wildcart = true;
-				inc(it_ptn);
-				continue;
-			}
-
-			if (get(it_txt) == get(it_ptn) ||
-				(get(it_ptn) == '?' && get(it_txt) != no_char))
-			{
-				if (get(it_txt) == no_char && get(it_ptn) == no_char)
-					return true;
-
-				inc(it_txt);
-				inc(it_ptn);
-				wildcart = false;
-				continue;
-			}
-
-			if (wildcart)
-			{
-				if (!inc(it_txt))
-					return false;
-
-				continue;
-			}
-
-			return false;
-		}
-	}
-
 	bool Match(const std::string& text, const std::string& pattern)
 	{
-		return	MatchImpl(std::make_pair(text.begin(), text.end()), std::make_pair(pattern.begin(), pattern.end())) ||
-			MatchImpl(std::make_pair(text.rbegin(), text.rend()), std::make_pair(pattern.rbegin(), pattern.rend()));
+		constexpr int string_begin = -1;
+		constexpr int string_end = -2;
+		auto&& getc = [](int i, const std::string& s, int string_size)
+		{
+			if (i <= -1)
+				return string_begin;
+			if (i >= string_size)
+				return string_end;
+
+			return (int)((unsigned char)s[i]);
+		};
+
+		auto&& find = [&getc](const std::string& s1, int pos1,
+			const std::string& s2, int pos2)
+		{
+			int i = pos1;
+			int j = pos2;
+			int i_match = -1;
+			int s1_size = (int)s1.size();
+			int s2_size = (int)s2.size();
+			while (true)
+			{
+				if (i > s1_size)
+					return std::make_pair(-1, -1);
+
+				int ch1 = getc(i, s1, s1_size);
+				int ch2 = getc(j, s2, s2_size);
+
+				if (ch2 == '*')
+					return std::make_pair(i, j);
+
+				if (ch1 == ch2 ||
+					(ch2 == '?' && ch1 != string_begin && ch1 != string_end))
+				{
+					if (ch1 == string_end)
+						return std::make_pair(i, j);
+
+					if (i_match == -1)
+						i_match = i;
+
+					i++;
+					j++;
+				}
+				else
+				{
+					if (j == pos2)
+						i++;
+
+					j = pos2;
+					if (i_match != -1)
+					{
+						i = i_match + 1;
+						i_match = -1;
+					}
+				}
+			}
+
+			return std::make_pair(-1, -1);
+		};
+
+		int i = -1;
+		int j = -1;
+		int pattern_size = (int)pattern.size();
+		while (j <= pattern_size)
+		{
+			while (getc(j, pattern, pattern_size) == '*')
+				j++;
+
+			auto ij = find(text, i, pattern, j);
+			if (ij.first == -1)
+				return false;
+
+			i = ij.first;
+			j = ij.second;
+			if (j == pattern.size())
+				return true;
+		}
+
+		return true;
 	}
 
 	template<typename Func>
