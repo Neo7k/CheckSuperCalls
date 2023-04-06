@@ -226,35 +226,46 @@ namespace
 		}
 	}
 
-	void UnrollTree(PathNode* node)
+	void UnrollTree(PathNode* node, int level)
 	{
 		if (fs::path(node->path).is_relative())
 		{
-			auto paths = Tokenize(node->path, '/', 2);
-			if (paths.size() > 1)
+			bool do_unroll = true;
+			if (node->path.find("..") != std::string::npos)
 			{
-				std::string root(paths[0]);
-				std::string child(paths[1]);
-				PathNode::Mode old_mode = node->mode;
+				if (level != 1)
+					throw Exception(std::format("{}\nGoing up with .. is allowed only on the root level", node->path));
+				do_unroll = false;
+			}
 
-				node->path = root;
-				node->mode = node->parent ? node->parent->mode : PathNode::Skip;
-				auto new_node = std::make_unique<PathNode>();
-				new_node->path = child;
-				new_node->mode = old_mode;
-				new_node->parent = node;
-				new_node->children = std::move(node->children);
-				for (auto& child : new_node->children)
-					child->parent = new_node.get();
+			if (do_unroll)
+			{
+				auto paths = Tokenize(node->path, '/', 2);
+				if (paths.size() > 1)
+				{
+					std::string root(paths[0]);
+					std::string child(paths[1]);
+					PathNode::Mode old_mode = node->mode;
 
-				node->children = decltype(node->children){};
-				node->children.push_back(std::move(new_node));
+					node->path = root;
+					node->mode = node->parent ? node->parent->mode : PathNode::Skip;
+					auto new_node = std::make_unique<PathNode>();
+					new_node->path = child;
+					new_node->mode = old_mode;
+					new_node->parent = node;
+					new_node->children = std::move(node->children);
+					for (auto& child : new_node->children)
+						child->parent = new_node.get();
+
+					node->children = decltype(node->children){};
+					node->children.push_back(std::move(new_node));
+				}
 			}
 		}
 
 		for (auto& child : node->children)
 		{
-			UnrollTree(child.get());
+			UnrollTree(child.get(), level + 1);
 		}
 	}
 }
@@ -283,7 +294,7 @@ CodeFiles::CodeFiles(const fs::path& path, const Config& config)
 	else
 	{
 		path_tree = ParseFilesConf(path);
-		UnrollTree(path_tree.get());
+		UnrollTree(path_tree.get(), 0);
 	}
 
 	const size_t files_num = 0x4000;
