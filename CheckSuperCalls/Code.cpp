@@ -37,7 +37,7 @@ void Code::ParseLookup(const fs::path& path, const std::string& content)
 					std::unique_lock lock(classdef_lookup_mutex);
 					auto& files = classdef_lookup[classname];
 					if (Find(files, path) == files.end())
-						classdef_lookup[classname].push_back(path);
+						files.push_back(path);
 				}
 			}
 			else
@@ -47,7 +47,6 @@ void Code::ParseLookup(const fs::path& path, const std::string& content)
 		find_res = find_first(content, pos, cl_st);
 	}
 }
-
 
 void Code::ParseHeaderForBaseClasses(const fs::path& path, const std::string& content)
 {

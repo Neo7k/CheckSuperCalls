@@ -42,8 +42,6 @@ protected:
 	Class* GetClass(const std::string& name, const string_vector& namespase, const string_vector& possible_namespase) const;
 	Class* CreateClass(const std::string& name, const string_vector& namespase, const fs::path& file);
 	const Class* FindFuncInSuper(const std::string func_name, const Class* clazz) const;
-	void CollectAllCallSupers();
-
 
 	void ParseNamespace(const std::string& content, size_t& pos, NamespaseStack& ns);
 	bool IsComment(const std::string& content, size_t pos);
