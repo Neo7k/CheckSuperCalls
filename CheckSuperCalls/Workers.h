@@ -8,36 +8,36 @@ public:
 	Workers(int num_workers);
 	virtual ~Workers();
 
-	bool AreAllFree() const;
-
 	using JobFunc = std::function<void(int thread_id, const fs::path&)>;
 
-	void WaitUntilAllFree() const;
-	void SetPaths(const FsPaths* paths);
-	void DoJob(const JobFunc& func);
+	void DoJob(const FsPaths* paths, JobFunc&& func);
 
 protected:
 
-	enum class WorkerStatus : char
-	{
-		Free,
-		Busy
-	};
-
-	static const int no_task = -1;
-
 	struct Worker
 	{
+		int task_id = 0;
 		std::thread* thread;
-		WorkerStatus status = WorkerStatus::Free;
-		int taks_id = no_task;
+		std::atomic<bool> busy = false;
 	};
 
-	void WorkerFunc(int thread_id);
 	void StartWorkers();
 
-	std::vector<Worker> workers;
-	JobFunc job;
-	const FsPaths* tasks = nullptr;
-	bool exit = false;
+	bool AreAllFree() const;
+	void WaitUntilAllFree();
+
+	void WorkerFunc(int thread_id);
+
+	Worker* workers = nullptr;
+	int num_workers = 0;
+	JobFunc job_func;
+	const FsPaths* paths = nullptr;
+	std::atomic<int> current_index = 0;
+	std::atomic<bool> exit = false;
+
+	std::condition_variable job_active_cv;
+	std::mutex job_active_mutex;
+
+	std::condition_variable worker_finished_cv;
+	std::mutex worker_finished_mutex;
 };

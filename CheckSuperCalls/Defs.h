@@ -12,6 +12,7 @@
 #include <iostream>
 #include <fstream>
 #include <thread>
+#include <condition_variable>
 #include <mutex>
 #include <chrono>
 #include <ctype.h>

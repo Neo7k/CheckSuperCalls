@@ -54,14 +54,13 @@ int main(int argc, const char* argv[])
 		t0 = timer.now();
 
 		Workers workers(num_threads);
-		workers.SetPaths(&files.GetHeaders());
 
 		if (config.GetVerbosity() > 0)
 		{
 			std::cout << "=================LOOKUP=================" << std::endl;
 		}
 
-		workers.DoJob([&code](int thread_index, auto& path)
+		workers.DoJob(&files.GetHeaders(), [&code](int thread_index, auto& path)
 					  {
 						  std::string content;
 						  if (ReadContent(path, content))
@@ -81,7 +80,7 @@ int main(int argc, const char* argv[])
 			std::cout << "===============BASE SEARCH==============" << std::endl;
 		}
 
-		workers.DoJob([&code](int thread_index, auto& path)
+		workers.DoJob(&files.GetHeaders(), [&code](int thread_index, auto& path)
 					  {
 						  std::string content;
 						  if (ReadContent(path, content))
@@ -121,7 +120,7 @@ int main(int argc, const char* argv[])
 			std::cout << "==============HEADER PARSE==============" << std::endl;
 		}
 
-		workers.DoJob([&code](int thread_index, auto& path)
+		workers.DoJob(&files.GetHeaders(), [&code](int thread_index, auto& path)
 					{
 						  std::string content;
 						  FsPaths paths;
@@ -142,8 +141,7 @@ int main(int argc, const char* argv[])
 			std::cout << "==============SOURCE PARSE==============" << std::endl;
 		}
 
-		workers.SetPaths(&files.GetSource());
-		workers.DoJob([&code, &result](int thread_index, auto& path)
+		workers.DoJob(&files.GetSource(), [&code, &result](int thread_index, auto& path)
 					  {
 						  std::string content;
 						  if (ReadContent(path, content))

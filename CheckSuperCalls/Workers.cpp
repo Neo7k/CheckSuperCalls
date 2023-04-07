@@ -5,7 +5,8 @@ std::chrono::milliseconds wait_time(10);
 
 Workers::Workers(int num_workers)
 {
-	workers.resize(num_workers);
+	this->num_workers = num_workers;
+	workers = new Worker[num_workers];
 	for (int i = 0; i < num_workers; i++)
 	{
 		auto thread = new std::thread([this, i]()
@@ -20,72 +21,76 @@ Workers::Workers(int num_workers)
 Workers::~Workers()
 {
 	exit = true;
-	for (auto& worker : workers)
-		worker.thread->join();
 
-	for (auto& worker : workers)
-		delete worker.thread;
+	job_active_cv.notify_all();
+
+	for (int i = 0; i < num_workers; i++)
+		workers[i].thread->join();
+
+	for (int i = 0; i < num_workers; i++)
+		delete workers[i].thread;
+
+	delete[] workers;
+}
+
+void Workers::DoJob(const FsPaths* paths, JobFunc&& func)
+{
+	WaitUntilAllFree();
+	this->paths = paths;
+	job_func = std::move(func);
+	StartWorkers();
+	WaitUntilAllFree();
+}
+
+void Workers::WaitUntilAllFree()
+{
+	std::unique_lock lk(worker_finished_mutex);
+	worker_finished_cv.wait(lk, [this] {return AreAllFree();});
 }
 
 bool Workers::AreAllFree() const
 {
-	for (auto& w : workers)
-		if (w.status != WorkerStatus::Free)
+	for (int i = 0; i < num_workers; i++)
+		if (workers[i].busy)
 			return false;
 
 	return true;
 }
 
-void Workers::DoJob(const JobFunc& func)
+void Workers::StartWorkers()
 {
-	WaitUntilAllFree();
-	job = func;
-	StartWorkers();
-	WaitUntilAllFree();
-}
-
-void Workers::SetPaths(const FsPaths* paths)
-{
-	tasks = paths;
-}
-
-void Workers::WaitUntilAllFree() const
-{
-	while (!AreAllFree())
-		std::this_thread::sleep_for(wait_time);
+	current_index = 0;
+	for (int i = 0; i < num_workers; i++)
+	{
+		workers[i].busy = true;
+	}
+	job_active_cv.notify_all();
 }
 
 void Workers::WorkerFunc(int thread_id)
 {
+	auto& worker = workers[thread_id];
+
 	while (!exit)
 	{
-		if (workers[thread_id].status == WorkerStatus::Free)
 		{
-			std::this_thread::sleep_for(wait_time);
-			continue;
+			// Sleep until marked as busy
+			std::unique_lock lock(job_active_mutex);
+			job_active_cv.wait(lock, [&worker, this] {return worker.busy.load() || exit.load();});
 		}
 
-		uint task_id = workers[thread_id].taks_id;
-		if (task_id == no_task)
-			task_id = thread_id;
-		else
-			task_id += (int)workers.size();
-
-		if (task_id < (int)tasks->size())
+		while (worker.busy)
 		{
-			job(thread_id, (*tasks)[task_id]);
-			workers[thread_id].taks_id = task_id;
+			worker.task_id = current_index.fetch_add(1);
+			if (paths && worker.task_id < paths->size())
+			{
+				job_func(thread_id, (*paths)[worker.task_id]);
+			}
+			else
+			{
+				worker.busy = false;
+				worker_finished_cv.notify_one();
+			}
 		}
-		else
-			workers[thread_id].status = WorkerStatus::Free;
-	}
-}
-
-void Workers::StartWorkers()
-{
-	for (auto& w : workers)
-	{
-		w.taks_id = no_task;
-		w.status = WorkerStatus::Busy;
 	}
 }
