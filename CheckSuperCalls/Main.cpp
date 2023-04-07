@@ -17,15 +17,17 @@ int main(int argc, const char* argv[])
 
 	try
 	{
-		InitKeywords();
-
 		std::chrono::system_clock timer;
 		auto t00 = timer.now();
-		auto t0 = timer.now();
 
 		Config config;
 		if (argc > 2)
 			config = Config(argv[2]);
+
+		g_Keywords[EKeywords::CallSuper] = config.GetCallSuperKeyword();
+		g_Keywords[EKeywords::SkipSuper] = config.GetSkipSuperKeyword();
+
+		InitKeywords();
 
 		Annex annex;
 
@@ -33,7 +35,7 @@ int main(int argc, const char* argv[])
 		const uint num_threads = std::thread::hardware_concurrency();
 		Result result(num_threads);
 
-		t0 = timer.now();
+		auto t0 = timer.now();
 
 		if (config.GetVerbosity() > 0)
 		{
